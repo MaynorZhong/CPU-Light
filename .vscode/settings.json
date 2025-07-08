@@ -1,0 +1,30 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "typescript.preferences.preferTypeOnlyAutoImports": true,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit",
+      "source.organizeImports": "explicit"
+    },
+    "files.associations": {
+      "*.rs": "rust"
+    },
+    "rust-analyzer.cargo.buildScripts.enable": true,
+    "rust-analyzer.check.command": "clippy"
+  },
+  "extensions": {
+    "recommendations": [
+      "esbenp.prettier-vscode",
+      "dbaeumer.vscode-eslint",
+      "bradlc.vscode-tailwindcss",
+      "rust-lang.rust-analyzer",
+      "tauri-apps.tauri-vscode"
+    ]
+  }
+}

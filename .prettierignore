@@ -1,0 +1,19 @@
+# Tauri后端代码（Rust）
+src-tauri/
+target/
+*.rs
+
+# 构建产物
+dist/
+build/
+node_modules/
+
+# 配置文件
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# 其他不需要格式化的文件
+*.log
+*.cache
+.DS_Store

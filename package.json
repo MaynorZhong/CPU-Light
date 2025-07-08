@@ -1,0 +1,78 @@
+{
+  "name": "cpu-light",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "lint": "eslint src --ext .ts,.tsx --fix",
+    "lint:check": "eslint src --ext .ts,.tsx",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "type-check": "tsc --noEmit",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:build:debug": "tauri build --debug",
+    "rust:check": "cd src-tauri && cargo check",
+    "rust:clippy": "cd src-tauri && cargo clippy",
+    "rust:format": "cd src-tauri && cargo fmt",
+    "rust:test": "cd src-tauri && cargo test",
+    "prepare": "node .husky/install.mjs",
+    "stylelint-check": "stylelint-config-prettier-check",
+    "clean": "rimraf dist && rimraf src-tauri/target",
+    "precommit": "lint-staged",
+    "commit": "git-cz",
+    "commitlint": "commitlint --config commitlint.config.mjs"
+  },
+  "config": {
+    "commitizen": {
+      "path": "node_modules/cz-git"
+    }
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "src/**/*.{json,css,md}": [
+      "prettier --write"
+    ]
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^4.1.11"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@eslint/js": "^9.30.1",
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^24.0.10",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "cz-git": "^1.11.2",
+    "eslint": "^9.30.1",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^16.3.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.2",
+    "prettier": "3.6.2",
+    "rimraf": "^6.0.1",
+    "stylelint": "^16.21.1",
+    "stylelint-config-prettier": "^9.0.5",
+    "stylelint-config-standard": "^38.0.0",
+    "typescript": "~5.6.2",
+    "typescript-eslint": "^8.36.0",
+    "vite": "^6.0.3"
+  }
+}
