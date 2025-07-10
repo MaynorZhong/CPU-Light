@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+// 导入 tray 模块
+mod tray;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -68,6 +71,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![greet, log_error, get_system_info])
         .setup(|app| {
+            // 创建系统托盘
+            if let Err(e) = tray::create_tray(app) {
+                log::error!("Failed to create tray: {}", e);
+            } else {
+                log::info!("Tray created successfully");
+            }
+
             log::info!("Application started successfully");
             log::info!("App version: {}", app.package_info().version);
             Ok(())
