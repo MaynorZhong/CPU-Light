@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    cpu_light_lib::run()
+    cpu_light_lib::run();
 }

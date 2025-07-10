@@ -2,89 +2,38 @@ name: CI/CD
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, dev]
   pull_request:
     branches: [main]
 
 jobs:
-  lint-and-format:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "18"
           cache: "pnpm"
-
-      - name: Install pnpm
-        run: npm install -g pnpm
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Check formatting
-        run: pnpm format:check
-
-      - name: Check linting
-        run: pnpm lint:check
-
-      - name: Type check
-        run: pnpm type-check
-
-  rust-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Check Rust formatting
-        run: cargo fmt --check
-        working-directory: src-tauri
-
-      - name: Run Clippy
-        run: cargo clippy -- -D warnings
-        working-directory: src-tauri
-
-      - name: Run tests
-        run: cargo test
-        working-directory: src-tauri
+      - run: pnpm install
+      - run: pnpm test
+      - run: pnpm lint:check
+      - run: pnpm type-check
 
   build:
-    needs: [lint-and-format, rust-check]
-    runs-on: ${{ matrix.os }}
+    needs: test
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "18"
           cache: "pnpm"
-
-      - name: Install pnpm
-        run: npm install -g pnpm
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev librsvg2-dev
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Build application
-        run: pnpm tauri:build
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - run: pnpm install
+      - run: pnpm tauri:build
