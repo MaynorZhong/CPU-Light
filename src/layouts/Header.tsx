@@ -30,7 +30,10 @@ const Header: FC<HeaderProps> = () => {
         <IconArrowsMinimize className="w-[70%] opacity-0 transition-opacity group-hover:opacity-100" />
       ),
       action: () => {
-        currentWindow.minimize();
+        console.log("Minimize or Unmaximize", currentWindow.isMaximized);
+        currentWindow.isMaximized
+          ? currentWindow.unmaximize()
+          : currentWindow.minimize();
       },
       label: "Minimize",
       bgColor: "#ffbd2e",
