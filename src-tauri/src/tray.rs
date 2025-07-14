@@ -17,6 +17,14 @@ pub fn create_tray(app: &App) -> Result<TrayIcon> {
         .show_menu_on_left_click(false)
         .tooltip("CPU Light - 系统监控")
         .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => {
+                println!("show menu item was clicked");
+                // 当点击“打开”菜单项时，将展示并聚焦于主窗口
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
             "quit" => {
                 println!("quit menu item was clicked");
                 app.exit(0);

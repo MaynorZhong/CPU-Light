@@ -63,7 +63,6 @@ pnpm rust:clippy
 
 # 格式化 Rust 代码
 pnpm rust:format
-
 # 运行 Rust 测试
 pnpm rust:test
 ```
