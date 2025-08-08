@@ -1,67 +1,34 @@
 import js from "@eslint/js";
 import globals from "globals";
+import reactHooks from "eslint-plugin-react-hooks";
+import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
-import pluginReact from "eslint-plugin-react";
-import pluginReactHooks from "eslint-plugin-react-hooks";
-import eslintConfigPrettier from "eslint-config-prettier";
 
-export default [
-  // Base configuration
-  js.configs.recommended,
-
-  // TypeScript configuration
-  ...tseslint.configs.recommended,
-
-  // React configuration
-  pluginReact.configs.flat.recommended,
-
-  // Files to lint
+export default tseslint.config(
   {
-    files: ["src/**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+    ignores: [
+      "dist",
+      "src-tauri",
+      "build",
+      "node_modules",
+      "*.config.js",
+      "*.config.ts",
+    ],
+  },
+  {
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    files: ["**/*.{ts,tsx}"],
     languageOptions: {
-      globals: {
-        ...globals.browser,
-        ...globals.es2020,
-      },
       ecmaVersion: 2020,
-      sourceType: "module",
-      parserOptions: {
-        ecmaFeatures: {
-          jsx: true,
-        },
-      },
+      globals: globals.browser,
     },
     plugins: {
-      "react-hooks": pluginReactHooks,
+      "react-hooks": reactHooks,
+      "react-refresh": reactRefresh,
     },
     rules: {
-      // React rules
-      "react/react-in-jsx-scope": "off", // Not needed in React 17+
-      "react/prop-types": "off", // Using TypeScript for prop validation
-
-      // React Hooks rules
-      ...pluginReactHooks.configs.recommended.rules,
-
-      // General rules
-      "no-unused-vars": "off", // Handled by TypeScript
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        { argsIgnorePattern: "^_" },
-      ],
-      "@typescript-eslint/no-explicit-any": "warn",
-      "prefer-const": "warn",
-      "no-var": "error",
-
-      // Import rules
-      "no-duplicate-imports": "error",
+      ...reactHooks.configs.recommended.rules,
+      "no-empty-pattern": "off",
     },
-    settings: {
-      react: {
-        version: "detect",
-      },
-    },
-  },
-
-  // Prettier configuration (must be last)
-  eslintConfigPrettier,
-];
+  }
+);

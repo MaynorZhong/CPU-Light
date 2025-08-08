@@ -5,6 +5,7 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
+    "rootDirs": [".", "./.react-router/types"],
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -17,14 +18,15 @@
     /* Path mapping */
     "baseUrl": ".",
     "paths": {
+      "~/*": ["src/app/*"],
       "@/*": ["src/*"],
       "@components/*": ["src/components/*"],
-      "@assets/*": ["src/assets/*"],
+      "@hooks/*": ["src/hooks/*"],
       "@utils/*": ["src/utils/*"],
       "@types/*": ["src/types/*"],
-      "@hooks/*": ["src/hooks/*"],
+      "@constants/*": ["src/constants/*"],
       "@stores/*": ["src/stores/*"],
-      "@api/*": ["src/api/*"]
+      "@assets/*": ["src/assets/*"]
     },
 
     /* Linting */
@@ -38,6 +40,12 @@
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": [
+    "src",
+    "**/*",
+    "**/.server/**/*",
+    "**/.client/**/*",
+    ".react-router/types/**/*"
+  ],
+  "exclude": ["node_modules", "dist", "src-tauri"]
 }
