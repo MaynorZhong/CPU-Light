@@ -1,22 +1,53 @@
-// 应用常量
-export const APP_CONFIG = {
-  name: "CPU Light",
-  version: "0.1.0",
-  description: "一个使用Tauri构建的桌面应用程序",
-} as const;
+import type { Icon, IconProps } from "@tabler/icons-react";
 
-export const THEME = {
-  colors: {
-    primary: "#3B82F6",
-    secondary: "#6B7280",
-    success: "#10B981",
-    warning: "#F59E0B",
-    error: "#EF4444",
+import {
+  IconWorldCog,
+  IconCpu,
+  IconBrandDatabricks,
+  IconFingerprint,
+  IconDeviceSdCard,
+  IconArtboard,
+} from "@tabler/icons-react";
+
+type NavConfig = {
+  link: string;
+  label: string;
+  icon:
+    | React.ForwardRefExoticComponent<IconProps & React.RefAttributes<Icon>>
+    | string;
+};
+
+const NAV_CONFIG = [
+  {
+    label: "系统概览",
+    link: "/",
+    icon: IconWorldCog,
   },
-} as const;
+  {
+    label: "处理器",
+    link: "/cpu",
+    icon: IconCpu,
+  },
+  {
+    label: "缓存",
+    link: "/cache",
+    icon: IconBrandDatabricks,
+  },
+  {
+    label: "主板",
+    link: "/motherboard",
+    icon: IconFingerprint,
+  },
+  {
+    label: "内存",
+    link: "/memory",
+    icon: IconDeviceSdCard,
+  },
+  {
+    label: "显卡",
+    link: "/gpu",
+    icon: IconArtboard,
+  },
+] as NavConfig[];
 
-export const ROUTES = {
-  home: "/",
-  settings: "/settings",
-  about: "/about",
-} as const;
+export { NAV_CONFIG };

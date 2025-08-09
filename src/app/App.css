@@ -1,21 +1,2 @@
 @import "tailwindcss";
 @import "@mantine/core/styles.css";
-
-:root {
-  --bg-primary: rgba(248, 249, 250, 0.95);
-  --bg-secondary: rgba(255, 255, 255, 0.8);
-  --bg-card: rgba(255, 255, 255, 0.9);
-  --text-primary: #1a1a1a;
-  --text-secondary: #666666;
-  --text-tertiary: #999999;
-  --accent-color: #007aff;
-  --accent-secondary: #34c759;
-  --border-color: rgba(0, 0, 0, 0.08);
-  --shadow-light: rgba(255, 255, 255, 0.8);
-  --shadow-dark: rgba(0, 0, 0, 0.1);
-  --glass-bg: rgba(255, 255, 255, 0.3);
-  --glass-border: rgba(255, 255, 255, 0.4);
-  --sidebar-bg: rgba(245, 245, 247, 0.9);
-  --hover-bg: rgba(0, 122, 255, 0.1);
-  --titlebar-bg: rgba(255, 255, 255, 0.95);
-}

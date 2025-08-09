@@ -64,6 +64,8 @@ src-tauri/target
 coverage
 *.lcov
 
+design.html
+
 # ESLint cache
 .eslintcache
 

@@ -4,6 +4,8 @@ import {
   IconX,
 } from "@tabler/icons-react";
 
+import Logo from "@/assets/app.svg?react";
+
 import { type ReactNode, FC, memo } from "react";
 import { useTauriWindow } from "@/hooks";
 
@@ -29,11 +31,11 @@ const Header: FC<HeaderProps> = () => {
       icon: (
         <IconArrowsMinimize className="w-[70%] opacity-0 transition-opacity group-hover:opacity-100" />
       ),
-      action: () => {
+      action: async () => {
         console.log("Minimize or Unmaximize", currentWindow.isMaximized);
-        currentWindow.isMaximized
+        await (currentWindow.isMaximized
           ? currentWindow.unmaximize()
-          : currentWindow.minimize();
+          : currentWindow.minimize());
       },
       label: "Minimize",
       bgColor: "#ffbd2e",
@@ -69,7 +71,9 @@ const Header: FC<HeaderProps> = () => {
           );
         })}
       </div>
-      <span>CPU-Light</span>
+      <span className="flex items-center gap-1">
+        <Logo className="h-4 w-4" /> CPU-Light
+      </span>
       <div className="invisible flex items-center gap-2">
         {windowControlsBtn.map(item => {
           return (

@@ -1,3 +1,4 @@
+/// <reference types="vite-plugin-svgr/client" />
 // 全局类型定义
 declare global {
   // 在构建时会被替换的全局变量
@@ -20,6 +21,16 @@ interface ImportMetaEnv {
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;
+}
+
+// SVG 模块声明：支持默认导出路径字符串 & 命名导出 ReactComponent
+declare module "*.svg" {
+  import * as React from "react";
+  export const ReactComponent: React.FC<
+    React.SVGProps<SVGSVGElement> & { title?: string }
+  >;
+  const src: string;
+  export default src;
 }
 
 export {};
