@@ -58,6 +58,7 @@
     "@tailwindcss/vite": "^4.1.11",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "clsx": "^2.1.1",
     "isbot": "^5",
     "motion": "^12.23.12",
     "react": "^18.3.1",

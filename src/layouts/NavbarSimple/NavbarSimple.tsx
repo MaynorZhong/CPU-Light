@@ -2,27 +2,23 @@ import { useState } from "react";
 import { Code, Group } from "@mantine/core";
 import classes from "./NavbarSimple.module.css";
 
+import { NavLink } from "react-router";
+
 import Logo from "@/assets/app.svg?react";
 
 import { NAV_CONFIG } from "@/constants";
+import { ActionToggle } from "@/components/ActionToggle";
 
 export function NavbarSimple() {
-  const [active, setActive] = useState("Billing");
-
   const links = NAV_CONFIG.map(item => (
-    <a
-      className={classes.link}
-      data-active={item.label === active || undefined}
-      href={item.link}
-      key={item.label}
-      onClick={event => {
-        event.preventDefault();
-        setActive(item.label);
-      }}
+    <NavLink
+      to={item.link}
+      key={item.key}
+      className={({ isActive }) => (isActive ? classes.active : classes.link)}
     >
       <item.icon className={classes.linkIcon} stroke={1.5} />
       <span>{item.label}</span>
-    </a>
+    </NavLink>
   ));
 
   return (
@@ -38,7 +34,9 @@ export function NavbarSimple() {
         {links}
       </div>
 
-      <div className={classes.footer}></div>
+      <div className={classes.footer}>
+        <ActionToggle />
+      </div>
     </nav>
   );
 }

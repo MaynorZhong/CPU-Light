@@ -13,6 +13,21 @@ type Pages = {
   "/": {
     params: {};
   };
+  "/motherboard": {
+    params: {};
+  };
+  "/memory": {
+    params: {};
+  };
+  "/cache": {
+    params: {};
+  };
+  "/cpu": {
+    params: {};
+  };
+  "/gpu": {
+    params: {};
+  };
   "/*": {
     params: {
       "*": string;
@@ -23,11 +38,31 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/*";
+    page: "/" | "/motherboard" | "/memory" | "/cache" | "/cpu" | "/gpu" | "/*";
+  };
+  "routes/motherboard.tsx": {
+    id: "routes/motherboard";
+    page: "/motherboard";
   };
   "routes/_index.tsx": {
     id: "routes/_index";
     page: "/";
+  };
+  "routes/memory.tsx": {
+    id: "routes/memory";
+    page: "/memory";
+  };
+  "routes/cache.tsx": {
+    id: "routes/cache";
+    page: "/cache";
+  };
+  "routes/cpu.tsx": {
+    id: "routes/cpu";
+    page: "/cpu";
+  };
+  "routes/gpu.tsx": {
+    id: "routes/gpu";
+    page: "/gpu";
   };
   "routes/$.tsx": {
     id: "routes/$";

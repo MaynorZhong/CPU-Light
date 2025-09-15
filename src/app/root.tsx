@@ -45,7 +45,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* <Header /> */}
           <div className="flex h-screen w-full">
             <NavbarSimple />
-            <div className="p-4">{children}</div>
+            <div className="w-full px-[30px] py-[20px]">{children}</div>
           </div>
         </MantineProvider>
         <ScrollRestoration />
