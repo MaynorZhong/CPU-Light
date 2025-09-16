@@ -11,6 +11,7 @@ type ViewCardProps = {
   gap?: number;
   title?: string;
   icon?: ReactNode;
+  headerClass?: React.CSSProperties | undefined;
 };
 
 const ViewCard: FC<ViewCardProps> = props => {
@@ -23,6 +24,7 @@ const ViewCard: FC<ViewCardProps> = props => {
     gap = 16,
     icon,
     title = "",
+    headerClass,
   } = props;
 
   const calcWidth = useMemo(() => {
@@ -60,24 +62,14 @@ const ViewCard: FC<ViewCardProps> = props => {
           "box-shadow": "0 4px 20px rgba(0, 0, 0, 0.05)",
         }}
       >
-        <Card.Section inheritPadding py="xs">
+        <Card.Section inheritPadding py="xs" style={headerClass}>
           <Flex justify="space-between">
             <div className="flex w-full gap-2 antialiased">
-              <div className="flex h-[24px] w-[24px] items-center justify-center rounded-sm bg-linear-135 from-[#007aff] to-[#5ac8fa] text-white">
-                {icon ?? (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="icon icon-tabler icons-tabler-filled icon-tabler-device-imac"
-                  >
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M8 22a1 1 0 0 1 0 -2h.616l.25 -2h-4.866a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-4.867l.25 2h.617a1 1 0 0 1 0 2zm5.116 -4h-2.233l-.25 2h2.733z" />
-                  </svg>
-                )}
-              </div>
+              {icon && (
+                <div className="flex h-[24px] w-[24px] items-center justify-center rounded-sm bg-linear-135 from-[#007aff] to-[#5ac8fa] text-white">
+                  {icon}
+                </div>
+              )}
               <span className="text-[16px] font-semibold">{title}</span>
             </div>
 
@@ -85,7 +77,7 @@ const ViewCard: FC<ViewCardProps> = props => {
           </Flex>
         </Card.Section>
         <Card.Section mt="sm">
-          <div>{children}</div>
+          <div className="px-3 pb-3">{children}</div>
         </Card.Section>
       </Card>
     </motion.div>

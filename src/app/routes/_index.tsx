@@ -1,6 +1,16 @@
-import { useState } from "react";
 import { Container } from "@mantine/core";
 import ViewCard from "@/components/ViewCard";
+
+import EquipmentTable from "./components/EquipmentTable";
+import SystemStatusTable from "./components/SystemStatusTable";
+import BatteryTable from "./components/BatteryTable";
+import NetworkTable from "./components/NetworkTable";
+import {
+  IconAdjustmentsCog,
+  IconBattery,
+  IconDeviceImacFilled,
+  IconNetwork,
+} from "@tabler/icons-react";
 
 function Home() {
   return (
@@ -25,8 +35,27 @@ function Home() {
           <div className="text-[16px] font-semibold">14.2.1 (23C71)</div>
         </div>
       </Container>
-      <div className="mt-6 flex w-full gap-4">
-        <ViewCard />
+      <div className="mt-6 flex w-full flex-wrap gap-[16px]">
+        <ViewCard
+          col={2}
+          title="设备信息"
+          icon={<IconAdjustmentsCog size={16} />}
+        >
+          <EquipmentTable />
+        </ViewCard>
+        <ViewCard
+          col={2}
+          title="系统状态"
+          icon={<IconDeviceImacFilled size={16} />}
+        >
+          <SystemStatusTable />
+        </ViewCard>
+        <ViewCard col={2} title="电池状态" icon={<IconBattery size={16} />}>
+          <BatteryTable />
+        </ViewCard>
+        <ViewCard col={2} title="网络状态" icon={<IconNetwork size={16} />}>
+          <NetworkTable />
+        </ViewCard>
       </div>
     </div>
   );
