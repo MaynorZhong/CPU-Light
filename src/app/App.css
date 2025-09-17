@@ -18,3 +18,32 @@
 .mantine-Table-tr {
   border-color: light-dark("#f8f9fa", var(--mantine-color-dark-2));
 }
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    135deg,
+    rgba(90, 200, 250, 0.25) 0%,
+    rgba(0, 122, 255, 0.25) 100%
+  );
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 200, 250, 0.25) transparent;
+}
+
+html,
+body,
+* {
+  scroll-behavior: smooth;
+}
