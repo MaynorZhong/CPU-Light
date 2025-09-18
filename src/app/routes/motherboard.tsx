@@ -1,4 +1,5 @@
 import React, { type ReactNode, FC, memo } from "react";
+import BoardTable from "./components/BoardTable";
 
 type MotherboardProps = {
   children?: ReactNode;
@@ -6,7 +7,11 @@ type MotherboardProps = {
 
 const Motherboard: FC<MotherboardProps> = props => {
   const { children } = props;
-  return <div>motherboard</div>;
+  return (
+    <div>
+      <BoardTable />
+    </div>
+  );
 };
 
 export default memo(Motherboard);
