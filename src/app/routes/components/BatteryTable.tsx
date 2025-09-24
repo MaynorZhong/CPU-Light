@@ -1,6 +1,8 @@
 import { Badge, Table } from "@mantine/core";
 import React, { type ReactNode, FC, memo } from "react";
 import { Progress } from "@mantine/core";
+import { useSysStore } from "@/store";
+import { useShallow } from "zustand/shallow";
 
 type BatteryTableProps = {
   children?: ReactNode;
@@ -8,6 +10,16 @@ type BatteryTableProps = {
 
 const BatteryTable: FC<BatteryTableProps> = props => {
   const { children } = props;
+
+  const { batterieInfo } = useSysStore(
+    useShallow(({ batterieInfo }) => ({
+      batterieInfo,
+    }))
+  );
+
+  const { percentage, state, cycle_count, temperature_c, voltage } =
+    batterieInfo?.batteries[0] || {};
+
   return (
     <Table variant="vertical" layout="fixed">
       <Table.Tbody>
@@ -16,9 +28,13 @@ const BatteryTable: FC<BatteryTableProps> = props => {
           <Table.Td>
             <div className="flex items-center justify-end gap-2">
               <Badge color="green" className="!h-2 !w-2" circle />
-              <span>20%</span>
+              <span>{`${percentage || "-"}%`}</span>
             </div>
-            <Progress value={20} size="lg" className="mt-1" />
+            <Progress
+              value={parseInt(percentage!) || 0}
+              size="lg"
+              className="mt-1"
+            />
           </Table.Td>
         </Table.Tr>
 
@@ -26,28 +42,50 @@ const BatteryTable: FC<BatteryTableProps> = props => {
           <Table.Th>充电状态</Table.Th>
           <Table.Td>
             <div className="flex items-center justify-end gap-2">
-              <Badge color="orange" className="!h-2 !w-2" circle />
-              <span>未充电</span>
+              <Badge
+                color={state === "Charging" ? "green" : "orange"}
+                className="!h-2 !w-2"
+                circle
+              />
+              <span>{state === "Charging" ? "充电中" : "未充电"}</span>
             </div>
           </Table.Td>
         </Table.Tr>
 
         <Table.Tr>
-          <Table.Th>电池健康</Table.Th>
+          <Table.Th>电池温度</Table.Th>
           <Table.Td>
             <div className="flex items-center justify-end gap-2">
               <Badge color="yellow" className="!h-2 !w-2" circle />
-              <span>正常</span>
+              <span>
+                {temperature_c
+                  ? `${parseFloat(temperature_c).toFixed(1)}°C`
+                  : "-"}
+              </span>
             </div>
           </Table.Td>
         </Table.Tr>
+
+        {/* <Table.Tr>
+          <Table.Th>当前电压</Table.Th>
+          <Table.Td>
+            <div className="flex items-center justify-end gap-2">
+              <Badge color="yellow" className="!h-2 !w-2" circle />
+              <span>{voltage ? `${parseFloat(voltage) * 1000}mV` : "-"}</span>
+            </div>
+          </Table.Td>
+        </Table.Tr> */}
 
         <Table.Tr>
           <Table.Th>循环计数</Table.Th>
           <Table.Td>
             <div className="flex items-center justify-end gap-2">
-              <Badge color="orange" className="!h-2 !w-2" circle />
-              <span>20</span>
+              <Badge
+                color={cycle_count! <= 300 ? "green" : "orange"}
+                className="!h-2 !w-2"
+                circle
+              />
+              <span>{cycle_count}</span>
             </div>
           </Table.Td>
         </Table.Tr>

@@ -4,15 +4,15 @@ import { useState } from "react";
 /**
  * 使用Tauri命令调用的Hook
  */
-export const useTauriCommand = <T = any>(
+export const useTauriCommand = <T = unknown>(
   command: string,
-  args?: Record<string, any>
+  args?: Record<string, unknown>
 ) => {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const execute = async (customArgs?: Record<string, any>) => {
+  const execute = async (customArgs?: Record<string, unknown>) => {
     setLoading(true);
     setError(null);
 
