@@ -61,23 +61,30 @@ type BatteriesType = Partial<{
   /// 0.0 - 100.0
   percentage: string;
 
-  /// 单位 Wh（如果能拿到）
-  energy_wh: string;
-  energy_full_wh: string;
-  energy_design_wh: string;
+  // 当前原始容量
+  apple_raw_current_capacity: number;
 
-  /// 电压 V（如果能拿到）
-  voltage: string;
+  // 原始最大容量
+  apple_raw_max_capacity: number;
+  // 设计容量
+  design_capacity: number;
+
+  // 当前容量 最大容量
+  current_capacity: number;
+  max_capacity: number;
+
+  time_to_full_seconds: number;
+  time_to_empty_seconds: number;
+  avg_time_to_full: number;
+
+  /// 电压 mv（如果能拿到）
+  voltage: number;
 
   /// 温度 °C（如果能拿到）
   temperature_c: string;
 
   /// 循环次数（如果能拿到）
   cycle_count: number;
-
-  /// 估算到满/空的秒数（如果能拿到）
-  time_to_full_seconds: number;
-  time_to_empty_seconds: number;
 }>;
 
 type BatteryInfoType = {

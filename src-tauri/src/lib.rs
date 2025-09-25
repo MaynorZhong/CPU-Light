@@ -1,4 +1,4 @@
-use std::{collections::HashMap, process::Command};
+use std::{collections::HashMap, process::Command, time::Duration};
 
 use regex::Regex;
 use tauri::{path::BaseDirectory, Manager};
@@ -6,6 +6,7 @@ use tauri::{path::BaseDirectory, Manager};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::net::IpAddr;
 use sysinfo::{Disks, System};
 
 // 导入 tray 模块
@@ -421,12 +422,22 @@ pub struct SingleBattery {
     /// 0.0 - 100.0
     pub percentage: Option<f32>,
 
-    /// 单位 Wh（如果能拿到）
-    pub energy_wh: Option<f32>,
-    pub energy_full_wh: Option<f32>,
-    pub energy_design_wh: Option<f32>,
+    // 当前原始容量
+    pub apple_raw_current_capacity: Option<u64>,
 
-    /// 电压 V（如果能拿到）
+    // 原始最大容量
+    pub apple_raw_max_capacity: Option<u64>,
+    // 设计容量
+    pub design_capacity: Option<u32>,
+
+    // 当前容量 最大容量
+    pub current_capacity: Option<u32>,
+    pub max_capacity: Option<u32>,
+
+    pub time_to_full_seconds: Option<u32>,
+    pub time_to_empty_seconds: Option<u32>,
+
+    /// 电压 mv（如果能拿到）
     pub voltage: Option<f32>,
 
     /// 温度 °C（如果能拿到）
@@ -434,10 +445,6 @@ pub struct SingleBattery {
 
     /// 循环次数（如果能拿到）
     pub cycle_count: Option<u32>,
-
-    /// 估算到满/空的秒数（如果能拿到）
-    pub time_to_full_seconds: Option<u64>,
-    pub time_to_empty_seconds: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -489,8 +496,11 @@ fn fetch_battery_macos() -> anyhow::Result<BatteryInfo> {
             percentage = Some(v);
         }
     }
-    if pm_stdout.to_lowercase().contains("charging")
-        || pm_stdout.to_lowercase().contains("now drawing from 'ac'")
+
+    println!("pmset output: {}", pm_stdout);
+    if pm_stdout
+        .to_lowercase()
+        .contains("now drawing from 'ac power'")
     {
         state = "Charging".to_string();
     } else if pm_stdout.to_lowercase().contains("discharging")
@@ -514,14 +524,19 @@ fn fetch_battery_macos() -> anyhow::Result<BatteryInfo> {
     let kv_re = Regex::new(r#"\"(?P<k>[A-Za-z0-9_]+)\"\s+=\s+(?P<v>.+)"#).unwrap();
 
     let mut cycle_count: Option<u32> = None;
-    let mut design_capacity_wh: Option<f32> = None;
-    let mut current_capacity_wh: Option<f32> = None;
-    let mut max_capacity_wh: Option<f32> = None;
+    let mut design_capacity: Option<u32> = None;
+    let mut current_capacity: Option<u32> = None;
+    let mut max_capacity: Option<u32> = None;
     let mut temp_c: Option<f32> = None;
-    let mut voltage_v: Option<f32> = None;
+    let mut voltage: Option<f32> = None;
     let mut serial: Option<String> = None;
     let mut model: Option<String> = None;
     let mut vendor: Option<String> = None;
+    let mut apple_raw_current_capacity: Option<u64> = None;
+    let mut apple_raw_max_capacity: Option<u64> = None;
+    let mut avg_time_to_full: Option<u32> = None;
+    let mut remain_time: Option<u32> = None;
+    let mut is_charging: bool = false;
 
     for cap in kv_re.captures_iter(&ioreg_out) {
         let key = cap.name("k").unwrap().as_str();
@@ -533,19 +548,49 @@ fn fetch_battery_macos() -> anyhow::Result<BatteryInfo> {
                     cycle_count = Some(n);
                 }
             }
+            "AvgTimeToFull" => {
+                if let Ok(n) = val_raw.parse::<u32>() {
+                    if is_charging {
+                        avg_time_to_full = Some(n * 60); // minutes to seconds
+                    } else {
+                        avg_time_to_full = None;
+                    }
+                }
+            }
+            "TimeRemaining" => {
+                if let Ok(n) = val_raw.parse::<u32>() {
+                    remain_time = Some(n * 60); // minutes to seconds
+                }
+            }
+            "AppleRawCurrentCapacity" => {
+                if let Ok(n) = val_raw.parse::<u64>() {
+                    apple_raw_current_capacity = Some(n);
+                }
+            }
+            "AppleRawMaxCapacity" => {
+                if let Ok(n) = val_raw.parse::<u64>() {
+                    apple_raw_max_capacity = Some(n);
+                }
+            }
+            // 单位mAh/mWh，非 Wh
             "DesignCapacity" => {
-                if let Ok(n) = val_raw.parse::<f32>() {
-                    design_capacity_wh = Some(n / 1000.0);
+                if let Ok(n) = val_raw.parse::<u32>() {
+                    design_capacity = Some(n);
                 } // ioreg often in mAh/mWh — best-effort convert
             }
             "MaxCapacity" | "MaxCapacityOperation" => {
-                if let Ok(n) = val_raw.parse::<f32>() {
-                    max_capacity_wh = Some(n / 1000.0);
+                if let Ok(n) = val_raw.parse::<u32>() {
+                    max_capacity = Some(n);
                 }
             }
             "CurrentCapacity" | "CurrentCapacityOperation" => {
-                if let Ok(n) = val_raw.parse::<f32>() {
-                    current_capacity_wh = Some(n / 1000.0);
+                if let Ok(n) = val_raw.parse::<u32>() {
+                    current_capacity = Some(n);
+                }
+            }
+            "IsCharging" => {
+                if let Ok(n) = val_raw.parse::<bool>() {
+                    is_charging = n;
                 }
             }
             "Temperature" => {
@@ -557,18 +602,18 @@ fn fetch_battery_macos() -> anyhow::Result<BatteryInfo> {
             }
             "Voltage" => {
                 if let Ok(n) = val_raw.parse::<f32>() {
-                    // often in mV
-                    voltage_v = Some(if n > 1000.0 { n / 1000.0 } else { n });
+                    // mV
+                    voltage = Some(n);
                 }
             }
-            "SerialNumber" | "BatterySerial" => {
+            "Serial" | "BatterySerial" => {
                 // remove quotes if present
                 let cleaned = val_raw.trim_matches('"').to_string();
                 if !cleaned.is_empty() {
                     serial = Some(cleaned);
                 }
             }
-            "ProductName" | "Model" => {
+            "DeviceName" | "Model" => {
                 let cleaned = val_raw.trim_matches('"').to_string();
                 if !cleaned.is_empty() {
                     model = Some(cleaned);
@@ -596,21 +641,292 @@ fn fetch_battery_macos() -> anyhow::Result<BatteryInfo> {
         model,
         serial_number: serial,
         state,
+        apple_raw_current_capacity,
+        apple_raw_max_capacity,
         percentage,
-        energy_wh: current_capacity_wh,
-        energy_full_wh: max_capacity_wh,
-        energy_design_wh: design_capacity_wh,
-        voltage: voltage_v,
+        current_capacity,
+        max_capacity,
+        design_capacity,
+        voltage,
         temperature_c: temp_c,
         cycle_count,
-        time_to_full_seconds: None,
-        time_to_empty_seconds: None,
+        time_to_full_seconds: avg_time_to_full,
+        time_to_empty_seconds: remain_time,
     };
 
     Ok(BatteryInfo {
         batteries: vec![b],
         timestamp_unix: now,
     })
+}
+
+#[derive(Serialize)]
+pub struct InterfaceInfo {
+    pub name: String,
+    pub mac: Option<String>,
+    pub ips: Vec<String>,
+    pub is_up: bool,
+    pub is_loopback: bool,
+    pub mtu: Option<u32>,
+}
+
+#[derive(Serialize)]
+pub struct WifiInfo {
+    pub ssid: Option<String>,
+    pub bssid: Option<String>,
+    pub signal_dbm: Option<i32>,
+    pub frequency_mhz: Option<u32>,
+    pub iface: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct MacNetworkStatus {
+    pub interfaces: Vec<InterfaceInfo>,
+    pub online: bool,
+    pub default_gateway: Option<String>,
+    pub dns_servers: Vec<String>,
+    pub wifi: Option<WifiInfo>,
+    pub public_ip: Option<String>,
+}
+
+#[tauri::command]
+async fn get_network_status_macos(
+    include_public_ip: Option<bool>,
+) -> Result<MacNetworkStatus, String> {
+    let include_public = include_public_ip.unwrap_or(false);
+    fetch_network_status_macos(include_public)
+        .await
+        .map_err(|e| format!("fetch error: {:?}", e))
+}
+
+// ---------- 主逻辑 (async) ----------
+async fn fetch_network_status_macos(include_public: bool) -> anyhow::Result<MacNetworkStatus> {
+    let interfaces = gather_interfaces_via_ifconfig().context("gather interfaces failed")?;
+    let wifi = get_wifi_info().ok().flatten();
+    let default_gateway = get_default_gateway().ok().flatten();
+    let dns_servers = get_dns_servers().unwrap_or_default();
+    let online = is_online_simple();
+    let public_ip = if include_public && online {
+        get_public_ip().await.ok()
+    } else {
+        None
+    };
+
+    Ok(MacNetworkStatus {
+        interfaces,
+        online,
+        default_gateway,
+        dns_servers,
+        wifi,
+        public_ip,
+    })
+}
+
+// ---------- 新实现：用 ifconfig -a 解析接口 ----------
+fn gather_interfaces_via_ifconfig() -> anyhow::Result<Vec<InterfaceInfo>> {
+    // run `ifconfig -a` and parse blocks per interface
+    let out = Command::new("ifconfig")
+        .arg("-a")
+        .output()
+        .context("running ifconfig -a")?;
+    if !out.status.success() {
+        return Err(anyhow::anyhow!("ifconfig failed"));
+    }
+    let txt = String::from_utf8_lossy(&out.stdout).to_string();
+
+    // Split into interface blocks. On macOS, interface header looks like:
+    // en0: flags=... mtu 1500
+    //     inet 192.168.1.10 netmask 0xffffff00 broadcast 192.168.1.255
+    //     inet6 ...
+    //     ether aa:bb:cc:dd:ee:ff
+    //
+    let header_re = Regex::new(r"(?m)^([0-9A-Za-z._-]+):\s+flags=.*?mtu\s+(\d+)").unwrap();
+    let inet_re = Regex::new(r"(?m)^\s+inet\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)").unwrap();
+    let inet6_re = Regex::new(r"(?m)^\s+inet6\s+([0-9a-fA-F:]+)").unwrap();
+    let ether_re = Regex::new(r"(?m)^\s+ether\s+([0-9a-fA-F:]{17})").unwrap();
+    let status_active_re = Regex::new(r"(?mi)status:\s*active").unwrap();
+    let up_flag_re = Regex::new(r"(?m)flags=[0-9]+<([^>]+)>").unwrap();
+
+    // We'll iterate through header matches, take substring from header.start to next header.start
+    let mut interfaces = Vec::new();
+    let mut positions: Vec<(usize, String, u32)> = Vec::new(); // (start_idx,name,mtu)
+
+    for cap in header_re.captures_iter(&txt) {
+        if let (Some(m0), Some(m1)) = (cap.get(0), cap.get(1)) {
+            let start = m0.start();
+            let name = m1.as_str().to_string();
+            let mtu: u32 = cap
+                .get(2)
+                .and_then(|m| m.as_str().parse::<u32>().ok())
+                .unwrap_or(0);
+            positions.push((start, name, mtu));
+        }
+    }
+
+    // sort by start just in case
+    positions.sort_by_key(|p| p.0);
+
+    for (i, (start, name, mtu_val)) in positions.iter().enumerate() {
+        let end = if i + 1 < positions.len() {
+            positions[i + 1].0
+        } else {
+            txt.len()
+        };
+        let block = &txt[*start..end];
+
+        // parse ips
+        let mut ips: Vec<String> = Vec::new();
+        for cap in inet_re.captures_iter(block) {
+            if let Some(ip) = cap.get(1) {
+                ips.push(ip.as_str().to_string());
+            }
+        }
+        for cap in inet6_re.captures_iter(block) {
+            if let Some(ip) = cap.get(1) {
+                ips.push(ip.as_str().to_string());
+            }
+        }
+
+        // mac
+        let mac = ether_re
+            .captures(block)
+            .and_then(|c| c.get(1).map(|m| m.as_str().to_ascii_lowercase()));
+
+        // is_up: check status: active OR flags contain "UP" or "RUNNING"
+        let is_up = status_active_re.is_match(block)
+            || up_flag_re
+                .captures(block)
+                .map(|c| c.get(1).map(|m| m.as_str().to_string()))
+                .flatten()
+                .map(|s| {
+                    s.split(',')
+                        .any(|f| f.eq_ignore_ascii_case("UP") || f.eq_ignore_ascii_case("RUNNING"))
+                })
+                .unwrap_or(false);
+
+        // is_loopback heuristics: name starts with lo or block contains "LOOPBACK"
+        let is_loopback = name.starts_with("lo") || block.to_lowercase().contains("loopback");
+
+        let mtu = if *mtu_val > 0 { Some(*mtu_val) } else { None };
+
+        interfaces.push(InterfaceInfo {
+            name: name.clone(),
+            mac,
+            ips,
+            is_up,
+            is_loopback,
+            mtu,
+        });
+    }
+
+    // sort for determinism
+    interfaces.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(interfaces)
+}
+
+// ---------- wifi (airport -I) ----------
+fn get_wifi_info() -> anyhow::Result<Option<WifiInfo>> {
+    let airport_path =
+        "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport";
+    if !std::path::Path::new(airport_path).exists() {
+        return Ok(None);
+    }
+
+    let out = Command::new(airport_path)
+        .arg("-I")
+        .output()
+        .context("running airport")?;
+    if !out.status.success() {
+        return Ok(None);
+    }
+    let s = String::from_utf8_lossy(&out.stdout);
+
+    let ssid = Regex::new(r"(?m)^\s*SSID:\s*(.+)$")
+        .unwrap()
+        .captures_iter(&s)
+        .next()
+        .and_then(|c| c.get(1).map(|m| m.as_str().trim().to_string()));
+    let bssid = Regex::new(r"(?m)^\s*BSSID:\s*([0-9a-fA-F:]{17})")
+        .unwrap()
+        .captures_iter(&s)
+        .next()
+        .and_then(|c| c.get(1).map(|m| m.as_str().to_string()));
+    let signal = Regex::new(r"(?m)^\s*agrCtlRSSI:\s*(-?\d+)")
+        .unwrap()
+        .captures_iter(&s)
+        .next()
+        .and_then(|c| c.get(1).and_then(|m| m.as_str().parse::<i32>().ok()));
+    let iface = Regex::new(r"(?m)^\s*interface:\s*(\w+)")
+        .unwrap()
+        .captures_iter(&s)
+        .next()
+        .and_then(|c| c.get(1).map(|m| m.as_str().to_string()));
+
+    Ok(Some(WifiInfo {
+        ssid,
+        bssid,
+        signal_dbm: signal,
+        frequency_mhz: None,
+        iface,
+    }))
+}
+
+// ---------- default gateway ----------
+fn get_default_gateway() -> anyhow::Result<Option<String>> {
+    let out = Command::new("route")
+        .args(&["-n", "get", "default"])
+        .output()
+        .context("route get default")?;
+    if !out.status.success() {
+        return Ok(None);
+    }
+    let s = String::from_utf8_lossy(&out.stdout);
+    let re = Regex::new(r"gateway:\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)").unwrap();
+    if let Some(cap) = re.captures(&s) {
+        return Ok(Some(cap.get(1).unwrap().as_str().to_string()));
+    }
+    Ok(None)
+}
+
+// ---------- dns servers ----------
+fn get_dns_servers() -> Option<Vec<String>> {
+    let out = Command::new("scutil").arg("--dns").output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&out.stdout);
+    let re = Regex::new(r"nameserver\[[0-9]+\]\s*:\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)").unwrap();
+    let mut v = Vec::new();
+    for cap in re.captures_iter(&s) {
+        v.push(cap.get(1).unwrap().as_str().to_string());
+    }
+    v.sort();
+    v.dedup();
+    Some(v)
+}
+
+// ---------- online check ----------
+fn is_online_simple() -> bool {
+    use std::net::TcpStream;
+    if let Ok(addr) = "1.1.1.1:53".parse() {
+        if let Ok(_) = TcpStream::connect_timeout(&addr, Duration::from_millis(800)) {
+            return true;
+        }
+    }
+    false
+}
+
+// ---------- public ip (optional) ----------
+async fn get_public_ip() -> anyhow::Result<String> {
+    #[derive(serde::Deserialize)]
+    struct Ipify {
+        ip: String,
+    }
+    let res_ip = reqwest::get("https://api64.ipify.org?format=json")
+        .await?
+        .json::<Ipify>()
+        .await?;
+    Ok(res_ip.ip)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -628,7 +944,8 @@ pub fn run() {
             get_device_info,
             get_hardware_data,
             get_system_metrics,
-            get_battery_info
+            get_battery_info,
+            get_network_status_macos
         ])
         .setup(|app| {
             // 创建系统托盘
