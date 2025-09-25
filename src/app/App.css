@@ -1,21 +1,49 @@
 @import "tailwindcss";
 @import "@mantine/core/styles.css";
 
-:root {
-  --bg-primary: rgba(248, 249, 250, 0.95);
-  --bg-secondary: rgba(255, 255, 255, 0.8);
-  --bg-card: rgba(255, 255, 255, 0.9);
-  --text-primary: #1a1a1a;
-  --text-secondary: #666666;
-  --text-tertiary: #999999;
-  --accent-color: #007aff;
-  --accent-secondary: #34c759;
-  --border-color: rgba(0, 0, 0, 0.08);
-  --shadow-light: rgba(255, 255, 255, 0.8);
-  --shadow-dark: rgba(0, 0, 0, 0.1);
-  --glass-bg: rgba(255, 255, 255, 0.3);
-  --glass-border: rgba(255, 255, 255, 0.4);
-  --sidebar-bg: rgba(245, 245, 247, 0.9);
-  --hover-bg: rgba(0, 122, 255, 0.1);
-  --titlebar-bg: rgba(255, 255, 255, 0.95);
+.mantine-Table-th {
+  @apply text-[14px] font-medium;
+  background: light-dark(#fff, var(--mantine-color-dark-6));
+  color: light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-2));
+}
+
+.mantine-Table-table {
+  @apply border-0;
+}
+
+.mantine-Table-td {
+  @apply text-right text-[14px] font-semibold;
+}
+
+.mantine-Table-tr {
+  border-color: light-dark("#f8f9fa", var(--mantine-color-dark-2));
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    135deg,
+    rgba(90, 200, 250, 0.25) 0%,
+    rgba(0, 122, 255, 0.25) 100%
+  );
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 200, 250, 0.25) transparent;
+}
+
+html,
+body,
+* {
+  scroll-behavior: smooth;
 }

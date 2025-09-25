@@ -9,13 +9,13 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
-import Header from "@/layouts/Header";
 
 import {
   ColorSchemeScript,
   MantineProvider,
   mantineHtmlProps,
 } from "@mantine/core";
+import { NavbarSimple } from "@/layouts/NavbarSimple/NavbarSimple";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -42,8 +42,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <MantineProvider>
-          <Header />
-          {children}
+          {/* <Header /> */}
+          <div className="flex h-screen w-full">
+            <NavbarSimple />
+            <div className="w-full overflow-y-auto px-[30px] py-[20px]">
+              {children}
+            </div>
+          </div>
         </MantineProvider>
         <ScrollRestoration />
         <Scripts />
@@ -73,11 +78,11 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="pt-16 p-4 container mx-auto">
+    <main className="container mx-auto p-4 pt-16">
       <h1>{message}</h1>
       <p>{details}</p>
       {stack && (
-        <pre className="w-full p-4 overflow-x-auto">
+        <pre className="w-full overflow-x-auto p-4">
           <code>{stack}</code>
         </pre>
       )}

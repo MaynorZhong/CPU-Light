@@ -29,6 +29,8 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       "no-empty-pattern": "off",
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "warn",
     },
   }
 );

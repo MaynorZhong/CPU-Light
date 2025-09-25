@@ -69,7 +69,9 @@ export const useTauriWindow = () => {
   };
 
   const unmaximize = () => {
-    isMaximized && currentWindow?.unmaximize();
+    if (isMaximized) {
+      currentWindow?.unmaximize();
+    }
     // 手动更新状态
     setTimeout(() => checkWindowState(), 100);
   };
@@ -78,16 +80,17 @@ export const useTauriWindow = () => {
   useEffect(() => {
     if (currentWindow) {
       checkWindowState();
-
       // 监听窗口调整大小事件
-      const unlisten = currentWindow.onResized(() => {
+      const unlistenPromise = currentWindow.onResized(() => {
         checkWindowState();
       });
-
       return () => {
-        unlisten.then(fn => fn());
+        // 确保卸载
+        void unlistenPromise.then(unlisten => unlisten());
       };
     }
+    // 显式返回 undefined 以满足 noImplicitReturns
+    return undefined;
   }, [currentWindow]);
 
   return {
