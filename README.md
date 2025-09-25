@@ -1,6 +1,7 @@
 # CPU Light
 
 一个使用 Tauri + React + TypeScript 构建的桌面应用程序。
+![alt text](image.png)
 
 ## 🚀 技术栈
 
