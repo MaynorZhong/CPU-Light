@@ -91,3 +91,44 @@ type BatteryInfoType = {
   batteries: BatteriesType[];
   timestamp_unix: number;
 };
+
+type InterfaceType = Partial<{
+  name: string;
+  mac: string;
+  ips: string[];
+  is_up: boolean;
+  is_loopback: boolean;
+  mtu: number;
+}>;
+
+type WifiInfoType = Partial<{
+  ssid: string;
+  bssid: string;
+  signal_dbm: number;
+  frequency_mhz: number;
+  iface: string;
+}>;
+
+type NetworkStatusType = Partial<{
+  interfaces: InterfaceType[];
+  online: boolean;
+  default_gateway: string;
+  dns_servers: string[];
+  wifi: WifiInfoType | null;
+  lic_ip: string;
+  public_ip: string;
+}>;
+
+export type {
+  SysInfoType,
+  MacOSMapEntry,
+  DeviceInfoType,
+  SystemMetrics,
+  DiskInfo,
+  HardwareDataType,
+  BatteryInfoType,
+  BatteriesType,
+  InterfaceType,
+  WifiInfoType,
+  NetworkStatusType,
+};

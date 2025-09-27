@@ -1,5 +1,5 @@
 import { useSysStore } from "@/store";
-import { formatSecindsToDHMS } from "@/utils/format-time";
+import { formatSecondsToDHMS } from "@/utils/format-time";
 import { Table } from "@mantine/core";
 import React, { type ReactNode, FC, memo } from "react";
 import { useShallow } from "zustand/shallow";
@@ -38,7 +38,7 @@ const EquipmentTable: FC<EquipmentTableProps> = props => {
           <Table.Th>运行时间</Table.Th>
           <Table.Td>
             {deviceInfo?.uptime_seconds &&
-              formatSecindsToDHMS(deviceInfo!.uptime_seconds!)}
+              formatSecondsToDHMS(deviceInfo!.uptime_seconds!)}
           </Table.Td>
         </Table.Tr>
       </Table.Tbody>

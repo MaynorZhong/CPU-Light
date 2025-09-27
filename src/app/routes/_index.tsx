@@ -16,6 +16,15 @@ import { useTauriCommand } from "@/hooks";
 import { useEffect, useRef, useState } from "react";
 import { useSysStore } from "@/store";
 import { useShallow } from "zustand/shallow";
+import type {
+  BatteryInfoType,
+  DeviceInfoType,
+  HardwareDataType,
+  MacOSMapEntry,
+  NetworkStatusType,
+  SysInfoType,
+  SystemMetrics,
+} from "@/types";
 
 function Home() {
   const { execute } = useTauriCommand<SysInfoType>("get_system_info");
@@ -28,45 +37,43 @@ function Home() {
   const { execute: getBatteryInfoExecutor } =
     useTauriCommand("get_battery_info");
 
-  const intervelRef = useRef<number | null>();
+  const { execute: getNetworkStatusExecutor } = useTauriCommand(
+    "get_network_status",
+    {
+      includePublicIp: true,
+    }
+  );
+
+  const intervalRef = useRef<number | null>();
 
   const [mapData, setMapData] = useState<MacOSMapEntry[] | null>(null);
 
   const {
     sysInfo,
     setSysInfo,
-    deviceInfo,
     setDeviceInfo,
-    hardwareInfo,
     setHardwareInfo,
-    systemMetrics,
     setSystemMetrics,
-    batterieInfo,
     setBatterieInfo,
+    setNetworkStatus,
   } = useSysStore(
     useShallow(
       ({
         sysInfo,
         setSysInfo,
-        deviceInfo,
         setDeviceInfo,
-        hardwareInfo,
         setHardwareInfo,
-        systemMetrics,
         setSystemMetrics,
-        batterieInfo,
         setBatterieInfo,
+        setNetworkStatus,
       }) => ({
         sysInfo,
         setSysInfo,
-        deviceInfo,
         setDeviceInfo,
-        hardwareInfo,
         setHardwareInfo,
-        systemMetrics,
         setSystemMetrics,
-        batterieInfo,
         setBatterieInfo,
+        setNetworkStatus,
       })
     )
   );
@@ -97,13 +104,18 @@ function Home() {
         console.log("get_battery_info", res);
         setBatterieInfo(res as BatteryInfoType);
       });
+
+      getNetworkStatusExecutor().then(res => {
+        console.log("network", res);
+        setNetworkStatus(res as NetworkStatusType);
+      });
     }, 5000);
 
-    intervelRef.current = id;
+    intervalRef.current = id;
 
     return () => {
-      if (intervelRef.current) {
-        clearInterval(intervelRef.current);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
       }
     };
   }, []);

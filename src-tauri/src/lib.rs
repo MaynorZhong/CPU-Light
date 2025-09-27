@@ -497,7 +497,6 @@ fn fetch_battery_macos() -> anyhow::Result<BatteryInfo> {
         }
     }
 
-    println!("pmset output: {}", pm_stdout);
     if pm_stdout
         .to_lowercase()
         .contains("now drawing from 'ac power'")
@@ -690,9 +689,7 @@ pub struct MacNetworkStatus {
 }
 
 #[tauri::command]
-async fn get_network_status_macos(
-    include_public_ip: Option<bool>,
-) -> Result<MacNetworkStatus, String> {
+async fn get_network_status(include_public_ip: Option<bool>) -> Result<MacNetworkStatus, String> {
     let include_public = include_public_ip.unwrap_or(false);
     fetch_network_status_macos(include_public)
         .await
@@ -701,6 +698,7 @@ async fn get_network_status_macos(
 
 // ---------- 主逻辑 (async) ----------
 async fn fetch_network_status_macos(include_public: bool) -> anyhow::Result<MacNetworkStatus> {
+    println!("include_public {:?}", include_public);
     let interfaces = gather_interfaces_via_ifconfig().context("gather interfaces failed")?;
     let wifi = get_wifi_info().ok().flatten();
     let default_gateway = get_default_gateway().ok().flatten();
@@ -824,50 +822,111 @@ fn gather_interfaces_via_ifconfig() -> anyhow::Result<Vec<InterfaceInfo>> {
     Ok(interfaces)
 }
 
-// ---------- wifi (airport -I) ----------
+// 使用 scutil --nwi + networksetup -getairportnetwork <iface> 的实现
 fn get_wifi_info() -> anyhow::Result<Option<WifiInfo>> {
-    let airport_path =
-        "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport";
-    if !std::path::Path::new(airport_path).exists() {
-        return Ok(None);
-    }
-
-    let out = Command::new(airport_path)
-        .arg("-I")
+    // 1) 先用 scutil --nwi 找出 primary interface（比如 en0/en1）
+    let scutil_out = Command::new("scutil")
+        .arg("--nwi")
         .output()
-        .context("running airport")?;
-    if !out.status.success() {
+        .context("running scutil --nwi")?;
+
+    if !scutil_out.status.success() {
         return Ok(None);
     }
-    let s = String::from_utf8_lossy(&out.stdout);
+    let sc = String::from_utf8_lossy(&scutil_out.stdout);
 
-    let ssid = Regex::new(r"(?m)^\s*SSID:\s*(.+)$")
-        .unwrap()
-        .captures_iter(&s)
-        .next()
-        .and_then(|c| c.get(1).map(|m| m.as_str().trim().to_string()));
-    let bssid = Regex::new(r"(?m)^\s*BSSID:\s*([0-9a-fA-F:]{17})")
-        .unwrap()
-        .captures_iter(&s)
-        .next()
-        .and_then(|c| c.get(1).map(|m| m.as_str().to_string()));
-    let signal = Regex::new(r"(?m)^\s*agrCtlRSSI:\s*(-?\d+)")
-        .unwrap()
-        .captures_iter(&s)
-        .next()
-        .and_then(|c| c.get(1).and_then(|m| m.as_str().parse::<i32>().ok()));
-    let iface = Regex::new(r"(?m)^\s*interface:\s*(\w+)")
-        .unwrap()
-        .captures_iter(&s)
-        .next()
+    // 常见行: "primary interface: en0"
+    let re_primary = Regex::new(r"(?mi)primary interface:\s*([0-9A-Za-z._-]+)").unwrap();
+    let primary_iface = re_primary
+        .captures(&sc)
         .and_then(|c| c.get(1).map(|m| m.as_str().to_string()));
 
+    // 如果 scutil 没给出 primary interface，尝试用 "PrimaryInterface"（某些 macOS 版本/语言）
+    let primary_iface = primary_iface.or_else(|| {
+        let re2 = Regex::new(r"(?mi)PrimaryInterface\s*:\s*([0-9A-Za-z._-]+)").unwrap();
+        re2.captures(&sc)
+            .and_then(|c| c.get(1).map(|m| m.as_str().to_string()))
+    });
+
+    // 2) 如果拿到接口名，调用 networksetup -getairportnetwork <iface> 获取 SSID
+    let mut ssid: Option<String> = None;
+    let mut iface_name: Option<String> = primary_iface.clone();
+
+    if let Some(iface) = primary_iface {
+        // networksetup -getairportnetwork <iface>
+        let out = Command::new("networksetup")
+            .arg("-getairportnetwork")
+            .arg(&iface)
+            .output()
+            .context("running networksetup -getairportnetwork")?;
+
+        if out.status.success() {
+            let s = String::from_utf8_lossy(&out.stdout);
+            // 成功样例: "Current Wi-Fi Network: MySSID"
+            if let Some(cap) = Regex::new(r"(?mi)Current Wi-?Fi Network:\s*(.+)$")
+                .unwrap()
+                .captures(&s)
+            {
+                let v = cap.get(1).unwrap().as_str().trim().to_string();
+                if !v.is_empty() {
+                    ssid = Some(v);
+                }
+            } else {
+                // 另一种样例: "You are not associated with an AirPort network."
+                // 则 ssid 保持 None
+            }
+        } else {
+            // networksetup 可能在某些系统版本需要不同权限；若失败，不立刻返回失败，后面再尝试 fallback
+            iface_name = Some(iface); // keep iface anyway
+        }
+    }
+
+    // 3) fallback：如果没有 primary iface 或 networksetup 失败，尝试找所有 en* 接口并对每个调用 networksetup
+    if ssid.is_none() {
+        // 用 ifconfig -a 找到可能的 wifi 接口（en0/en1/en2），按常见顺序尝试
+        if let Ok(out_if) = Command::new("ifconfig").arg("-a").output() {
+            if out_if.status.success() {
+                let txt = String::from_utf8_lossy(&out_if.stdout);
+                // 找所有以 en 开头的接口名
+                let re_iface = Regex::new(r"(?m)^([en][0-9]+):").unwrap();
+                for cap in re_iface.captures_iter(&txt) {
+                    if let Some(ifn) = cap.get(1) {
+                        let cand = ifn.as_str();
+                        // call networksetup -getairportnetwork <cand>
+                        if let Ok(out2) = Command::new("networksetup")
+                            .arg("-getairportnetwork")
+                            .arg(cand)
+                            .output()
+                        {
+                            if out2.status.success() {
+                                let s = String::from_utf8_lossy(&out2.stdout);
+                                if let Some(cap2) =
+                                    Regex::new(r"(?mi)Current Wi-?Fi Network:\s*(.+)$")
+                                        .unwrap()
+                                        .captures(&s)
+                                {
+                                    let v = cap2.get(1).unwrap().as_str().trim().to_string();
+                                    if !v.is_empty() {
+                                        ssid = Some(v);
+                                        iface_name = Some(cand.to_string());
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 4) 返回 WifiInfo：此方案只能保证 SSID + iface，BSSID/RSSI/frequency 无法通过 networksetup 获取 -> 返回 None
     Ok(Some(WifiInfo {
         ssid,
-        bssid,
-        signal_dbm: signal,
+        bssid: None,
+        signal_dbm: None,
         frequency_mhz: None,
-        iface,
+        iface: iface_name,
     }))
 }
 
@@ -918,14 +977,21 @@ fn is_online_simple() -> bool {
 
 // ---------- public ip (optional) ----------
 async fn get_public_ip() -> anyhow::Result<String> {
-    #[derive(serde::Deserialize)]
+    #[derive(serde::Deserialize, Debug)]
     struct Ipify {
         ip: String,
     }
-    let res_ip = reqwest::get("https://api64.ipify.org?format=json")
-        .await?
-        .json::<Ipify>()
-        .await?;
+    use std::time::Instant;
+    let now = Instant::now();
+    let resp = reqwest::get("https://api64.ipify.org?format=json").await;
+    eprintln!(
+        "reqwest get result: {:?}, elapsed: {:?}",
+        resp,
+        now.elapsed()
+    );
+    let res_ip = resp?.json::<Ipify>().await?;
+    eprintln!("json parsed: {:?}", res_ip);
+
     Ok(res_ip.ip)
 }
 
@@ -945,7 +1011,7 @@ pub fn run() {
             get_hardware_data,
             get_system_metrics,
             get_battery_info,
-            get_network_status_macos
+            get_network_status
         ])
         .setup(|app| {
             // 创建系统托盘

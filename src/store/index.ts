@@ -1,3 +1,11 @@
+import type {
+  BatteryInfoType,
+  DeviceInfoType,
+  HardwareDataType,
+  NetworkStatusType,
+  SysInfoType,
+  SystemMetrics,
+} from "@/types";
 import { create } from "zustand";
 
 interface State {
@@ -11,6 +19,8 @@ interface State {
   setSystemMetrics: (systemMetrics: SystemMetrics) => void;
   batterieInfo: BatteryInfoType | null;
   setBatterieInfo: (batterieInfo: BatteryInfoType | null) => void;
+  networkStatus: NetworkStatusType | null;
+  setNetworkStatus: (networkStatus: NetworkStatusType | null) => void;
 }
 
 const useSysStore = create<State>(set => ({
@@ -27,6 +37,8 @@ const useSysStore = create<State>(set => ({
     })),
   batterieInfo: null,
   setBatterieInfo: batterieInfo => set(() => ({ batterieInfo })),
+  networkStatus: null,
+  setNetworkStatus: networkStatus => set(() => ({ networkStatus })),
 }));
 
 export { useSysStore };

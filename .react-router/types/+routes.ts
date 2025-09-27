@@ -16,6 +16,9 @@ type Pages = {
   "/motherboard": {
     params: {};
   };
+  "/battery": {
+    params: {};
+  };
   "/memory": {
     params: {};
   };
@@ -38,11 +41,15 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/motherboard" | "/memory" | "/cache" | "/cpu" | "/gpu" | "/*";
+    page: "/" | "/motherboard" | "/battery" | "/memory" | "/cache" | "/cpu" | "/gpu" | "/*";
   };
   "routes/motherboard.tsx": {
     id: "routes/motherboard";
     page: "/motherboard";
+  };
+  "routes/battery.tsx": {
+    id: "routes/battery";
+    page: "/battery";
   };
   "routes/_index.tsx": {
     id: "routes/_index";
