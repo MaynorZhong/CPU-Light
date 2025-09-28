@@ -142,7 +142,7 @@ const BatteryDetail: FC<BatteryDetailProps> = props => {
             </Table.Td>
           </Table.Tr>
 
-          {state === "Charging" && (
+          {/* {state === "Charging" && (
             <Table.Tr>
               <Table.Th className="border-r-1 border-[#f8f9fa]">
                 预计充满时间
@@ -151,7 +151,7 @@ const BatteryDetail: FC<BatteryDetailProps> = props => {
                 {formatSecondsToDHMS(time_to_full_seconds || 0)}
               </Table.Td>
             </Table.Tr>
-          )}
+          )} */}
         </Table.Tbody>
       </Table>
     </ViewCard>

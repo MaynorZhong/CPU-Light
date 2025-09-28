@@ -21,6 +21,8 @@ interface State {
   setBatterieInfo: (batterieInfo: BatteryInfoType | null) => void;
   networkStatus: NetworkStatusType | null;
   setNetworkStatus: (networkStatus: NetworkStatusType | null) => void;
+  cpuInfo: unknown;
+  setCpuInfo: (cpuInfo: unknown) => void;
 }
 
 const useSysStore = create<State>(set => ({
@@ -39,6 +41,8 @@ const useSysStore = create<State>(set => ({
   setBatterieInfo: batterieInfo => set(() => ({ batterieInfo })),
   networkStatus: null,
   setNetworkStatus: networkStatus => set(() => ({ networkStatus })),
+  cpuInfo: null,
+  setCpuInfo: cpuInfo => set(() => ({ cpuInfo })),
 }));
 
 export { useSysStore };

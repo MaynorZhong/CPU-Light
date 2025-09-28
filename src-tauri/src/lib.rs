@@ -1,12 +1,17 @@
-use std::{collections::HashMap, process::Command, time::Duration};
+use std::{
+    collections::HashMap,
+    process::Command,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
+use nix::libc;
 use regex::Regex;
 use tauri::{path::BaseDirectory, Manager};
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::net::IpAddr;
+
 use sysinfo::{Disks, System};
 
 // 导入 tray 模块
@@ -995,6 +1000,268 @@ async fn get_public_ip() -> anyhow::Result<String> {
     Ok(res_ip.ip)
 }
 
+#[derive(Serialize)]
+pub struct CpuInfo {
+    // static / descriptive
+    pub model_name: Option<String>, // e.g. "Apple M4" or "Intel(R) Core(TM) i7-..."
+    pub architecture: Option<String>, // "arm64" / "x86_64"
+    pub physical_cores: Option<u32>,
+    pub logical_cores: Option<u32>,
+    pub cpu_frequency_hz: Option<u64>, // current or typical base freq
+    pub cpu_frequency_max_hz: Option<u64>,
+
+    // runtime / dynamic
+    pub loadavg_1: f64,
+    pub loadavg_5: f64,
+    pub loadavg_15: f64,
+    pub uptime_seconds: Option<u64>,
+
+    // totals / summary usage (best-effort)
+    pub cpu_usage_percent: Option<f64>, // total CPU usage % (approx via sampling)
+    pub per_core_usage_percent: Option<Vec<f64>>, // optional: null if not collected
+
+    // temperature & powermetrics (optional, may be null)
+    pub powermetrics_raw: Option<String>, // raw output if powermetrics ran
+    pub cpu_temperature_c: Option<f32>,   // parsed or null
+
+    // other useful raw data
+    pub sysctl_map: std::collections::HashMap<String, String>, // collected sysctl key -> value (for debugging)
+    pub timestamp_unix: u64,
+}
+
+/// 主命令：在 async 上下文中调用 spawn_blocking
+#[tauri::command]
+async fn get_cpu_info() -> Result<CpuInfo, String> {
+    let res = tauri::async_runtime::spawn_blocking(move || fetch_cpu_info_blocking()).await;
+    match res {
+        Ok(Ok(info)) => Ok(info),
+        Ok(Err(e)) => Err(format!("fetch cpu info error: {:?}", e)),
+        Err(e) => Err(format!("task join error: {:?}", e)),
+    }
+}
+
+fn fetch_cpu_info_blocking() -> anyhow::Result<CpuInfo> {
+    // helper: run sysctl -n <key> and return trimmed stdout
+    let run_sysctl = |key: &str| -> Option<String> {
+        if let Ok(out) = Command::new("sysctl").arg("-n").arg(key).output() {
+            if out.status.success() {
+                if let Ok(s) = String::from_utf8(out.stdout) {
+                    return Some(s.trim().to_string());
+                }
+            }
+        }
+        None
+    };
+
+    // collect a set of helpful sysctl keys (non-fatal)
+    let keys = [
+        "machdep.cpu.brand_string",
+        "machdep.cpu.model",
+        "machdep.cpu.family",
+        "machdep.cpu.vendor",
+        "hw.machine",
+        "hw.model",
+        "hw.physicalcpu", // physical cores
+        "hw.physicalcpu_max",
+        "hw.logicalcpu", // logical cores (threads)
+        "hw.logicalcpu_max",
+        "hw.cpufrequency", // Hz
+        "hw.cpufrequency_max",
+        "hw.cputype",
+        "hw.machine_arch",
+    ];
+    let mut sysctl_map = std::collections::HashMap::new();
+    for k in &keys {
+        if let Some(v) = run_sysctl(k) {
+            sysctl_map.insert(k.to_string(), v);
+        }
+    }
+
+    // model name heuristic
+    let model_name = sysctl_map
+        .get("machdep.cpu.brand_string")
+        .cloned()
+        .or_else(|| sysctl_map.get("hw.model").cloned())
+        .or_else(|| sysctl_map.get("hw.machine").cloned());
+
+    let architecture = run_sysctl("uname -m")
+        .or_else(|| run_sysctl("hw.machine_arch"))
+        // fallback: use std::env
+        .or_else(|| Some(std::env::consts::ARCH.to_string()));
+
+    // parse cores/freq
+    let physical_cores = sysctl_map
+        .get("hw.physicalcpu")
+        .and_then(|s| s.parse::<u32>().ok());
+    let logical_cores = sysctl_map
+        .get("hw.logicalcpu")
+        .and_then(|s| s.parse::<u32>().ok());
+    let cpu_freq = sysctl_map
+        .get("hw.cpufrequency")
+        .and_then(|s| s.parse::<u64>().ok());
+    let cpu_freq_max = sysctl_map
+        .get("hw.cpufrequency_max")
+        .and_then(|s| s.parse::<u64>().ok());
+
+    // load averages via libc getloadavg
+    let mut loads = [0f64; 3];
+    let n = unsafe { libc::getloadavg(loads.as_mut_ptr(), 3) };
+    let (la1, la5, la15) = if n == 3 {
+        (loads[0], loads[1], loads[2])
+    } else {
+        (0.0, 0.0, 0.0)
+    };
+
+    // uptime: use sysctl kern.boottime -> compute seconds since boot
+    let uptime_seconds = {
+        // call sysctl -n kern.boottime and parse like: { sec = 169... , usec = 0 } Wed ...
+        let out = Command::new("sysctl")
+            .arg("-n")
+            .arg("kern.boottime")
+            .output()
+            .ok();
+        if let Some(o) = out {
+            if o.status.success() {
+                if let Ok(s) = String::from_utf8(o.stdout) {
+                    // try capture sec = NUM
+                    let re = regex::Regex::new(r"sec\s*=\s*(\d+)").unwrap();
+                    if let Some(cap) = re.captures(&s) {
+                        if let Ok(sec) = cap.get(1).unwrap().as_str().parse::<u64>() {
+                            let now = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs();
+                            if now >= sec {
+                                Some(now - sec)
+                            } else {
+                                Some(0)
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+
+    // Approx total cpu usage %: do a quick sampling of `top -l 2 -n 0 -stats cpu` or `ps` as fallback
+    // We'll try to call "top -l 2 -n 0 -stats cpu" and parse the "CPU usage:" line from the second sample (macOS top outputs two samples; first is since boot)
+    let (cpu_usage_percent, per_core_vec) = {
+        // attempt top approach
+        let mut total_cpu_pct: Option<f64> = None;
+        let mut per_core: Option<Vec<f64>> = None;
+
+        if let Ok(out) = Command::new("top")
+            .args(&["-l", "2", "-n", "0", "-stats", "cpu"])
+            .output()
+        {
+            if out.status.success() {
+                if let Ok(txt) = String::from_utf8(out.stdout) {
+                    // find the last occurrence of "CPU usage:"
+                    // example line: "CPU usage: 6.43% user, 11.14% sys, 82.42% idle"
+                    if let Some(pos) = txt.rfind("CPU usage:") {
+                        if let Some(line) = txt[pos..].lines().next() {
+                            // parse user+sys and compute busy% = 100 - idle%
+                            let re_idle = regex::Regex::new(r"([0-9]+\.[0-9]+)%\s*idle").unwrap();
+                            if let Some(cap) = re_idle.captures(line) {
+                                if let Ok(idle_v) = cap.get(1).unwrap().as_str().parse::<f64>() {
+                                    total_cpu_pct = Some((100.0 - idle_v).max(0.0));
+                                }
+                            } else {
+                                // fallback: try parse user+sys
+                                let re_user =
+                                    regex::Regex::new(r"([0-9]+\.[0-9]+)%\s*user").unwrap();
+                                let re_sys = regex::Regex::new(r"([0-9]+\.[0-9]+)%\s*sys").unwrap();
+                                let user_v = re_user
+                                    .captures(line)
+                                    .and_then(|c| {
+                                        c.get(1).and_then(|m| m.as_str().parse::<f64>().ok())
+                                    })
+                                    .unwrap_or(0.0);
+                                let sys_v = re_sys
+                                    .captures(line)
+                                    .and_then(|c| {
+                                        c.get(1).and_then(|m| m.as_str().parse::<f64>().ok())
+                                    })
+                                    .unwrap_or(0.0);
+                                total_cpu_pct = Some(user_v + sys_v);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // per-core usage: try "sar -u" is not standard; we return None for now unless user asks for mach host_processor_info approach
+        (total_cpu_pct, per_core)
+    };
+
+    // powermetrics attempt: run powermetrics once for samplers "smc,cpu_power" (best-effort)
+    let (pm_raw, cpu_temp_c) = {
+        let pm_path = "/usr/bin/powermetrics";
+        if std::path::Path::new(pm_path).exists() {
+            // run with -n1 to sample once; samplers list may vary across OS versions
+            // note: powermetrics may require root or extra entitlements to return some fields.
+            match Command::new(pm_path)
+                .args(&["--samplers", "smc,cpu_power", "-n", "1"])
+                .output()
+            {
+                Ok(out) => {
+                    if out.status.success() {
+                        let raw = String::from_utf8_lossy(&out.stdout).to_string();
+                        // Try to extract a CPU temp heuristic: search for "CPU die temperature: 45.12 C" or "package temperature: 45.12 C"
+                        let re_temp = regex::Regex::new(r"(?i)(?:cpu die temperature|package temperature|core \d+ temperature)\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*C").unwrap();
+                        let temp = re_temp
+                            .captures(&raw)
+                            .and_then(|c| c.get(1).and_then(|m| m.as_str().parse::<f32>().ok()));
+                        (Some(raw), temp)
+                    } else {
+                        // capture stderr as diagnostic
+                        let errtxt = String::from_utf8_lossy(&out.stderr).to_string();
+                        (Some(format!("powermetrics failed: {}", errtxt)), None)
+                    }
+                }
+                Err(e) => (Some(format!("powermetrics exec error: {:?}", e)), None),
+            }
+        } else {
+            (None, None)
+        }
+    };
+
+    let timestamp_unix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    Ok(CpuInfo {
+        model_name,
+        architecture,
+        physical_cores,
+        logical_cores,
+        cpu_frequency_hz: cpu_freq,
+        cpu_frequency_max_hz: cpu_freq_max,
+        loadavg_1: la1,
+        loadavg_5: la5,
+        loadavg_15: la15,
+        uptime_seconds,
+        cpu_usage_percent,
+        per_core_usage_percent: per_core_vec,
+        powermetrics_raw: pm_raw,
+        cpu_temperature_c: cpu_temp_c,
+        sysctl_map,
+        timestamp_unix,
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 初始化日志
@@ -1011,7 +1278,8 @@ pub fn run() {
             get_hardware_data,
             get_system_metrics,
             get_battery_info,
-            get_network_status
+            get_network_status,
+            get_cpu_info
         ])
         .setup(|app| {
             // 创建系统托盘

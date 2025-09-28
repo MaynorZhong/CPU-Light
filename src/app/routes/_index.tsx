@@ -83,11 +83,11 @@ function Home() {
       setSysInfo(res);
     });
     loadMapExecutor().then(res => {
-      console.log("load_map result:", res);
+      // console.log("load_map result:", res);
       setMapData(res as MacOSMapEntry[]);
     });
     getDeviceInfoExecutor().then(res => {
-      console.log("get_device_info result:", res);
+      // console.log("get_device_info result:", res);
       setDeviceInfo(res as DeviceInfoType);
     });
 
@@ -97,16 +97,16 @@ function Home() {
 
     const id = window.setInterval(() => {
       getSystemMetricsExecutor().then(res => {
-        console.log("get_system_metrics", res);
+        // console.log("get_system_metrics", res);
         setSystemMetrics(res as SystemMetrics);
       });
       getBatteryInfoExecutor().then(res => {
-        console.log("get_battery_info", res);
+        // console.log("get_battery_info", res);
         setBatterieInfo(res as BatteryInfoType);
       });
 
       getNetworkStatusExecutor().then(res => {
-        console.log("network", res);
+        // console.log("network", res);
         setNetworkStatus(res as NetworkStatusType);
       });
     }, 5000);
