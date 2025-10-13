@@ -17,6 +17,12 @@ use sysinfo::{Disks, System};
 // 导入 tray 模块
 mod tray;
 
+mod cache_info;
+use cache_info::cache_info::get_cache_info;
+
+mod utils;
+use utils::utils::run_sysctl_n;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -237,7 +243,7 @@ struct Temps {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemMetrics {
-    cpu_usage_percent: f32, // 0.0..100.0
+    cpu_usage_percent: f64, // 0.0..100.0
     total_memory_kb: u64,
     used_memory_kb: u64,
     disks: Vec<DiskInfo>,
@@ -251,8 +257,13 @@ fn get_system_metrics() -> Result<SystemMetrics, String> {
 
     sys.refresh_all();
 
-    let cpu_usage =
-        sys.cpus().iter().map(|c| c.cpu_usage()).sum::<f32>() / (sys.cpus().len() as f32);
+    let cpu_usage_percent = match get_cpu_usage_from_top() {
+        Ok((val, _)) => val,
+        Err(e) => {
+            log::warn!("get_cpu_usage_from_top failed: {}", e);
+            0.0
+        }
+    };
 
     sys.refresh_all();
 
@@ -285,7 +296,7 @@ fn get_system_metrics() -> Result<SystemMetrics, String> {
     let temps = macos_try_get_temps();
 
     Ok(SystemMetrics {
-        cpu_usage_percent: cpu_usage,
+        cpu_usage_percent,
         total_memory_kb: total_memory,
         used_memory_kb: used_memory,
         disks,
@@ -1027,6 +1038,102 @@ pub struct CpuInfo {
     // other useful raw data
     pub sysctl_map: std::collections::HashMap<String, String>, // collected sysctl key -> value (for debugging)
     pub timestamp_unix: u64,
+    pub supports_virtualization: Option<bool>,
+    pub packages: Option<u32>,
+    pub process_stats: Option<ProcessStats>,
+}
+
+#[derive(Serialize)]
+pub struct ProcessStats {
+    pub total: Option<u32>,    // 总进程数
+    pub running: Option<u32>,  // 运行中
+    pub sleeping: Option<u32>, // 睡眠
+    pub threads: Option<u32>,  // 线程数
+}
+
+use std::path::Path;
+
+fn get_process_stats_from_top() -> Option<ProcessStats> {
+    let output = Command::new("top")
+        .args(&["-l", "1", "-n", "0"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let txt = String::from_utf8_lossy(&output.stdout);
+    let re = Regex::new(
+        r"Processes:\s*(\d+)\s+total,\s*(\d+)\s+running,\s*(\d+)\s+sleeping,\s*(\d+)\s+threads",
+    )
+    .ok()?;
+
+    if let Some(cap) = re.captures(&txt) {
+        Some(ProcessStats {
+            total: cap.get(1).and_then(|m| m.as_str().parse().ok()),
+            running: cap.get(2).and_then(|m| m.as_str().parse().ok()),
+            sleeping: cap.get(3).and_then(|m| m.as_str().parse().ok()),
+            threads: cap.get(4).and_then(|m| m.as_str().parse().ok()),
+        })
+    } else {
+        None
+    }
+}
+
+/// macOS: 检测是否支持虚拟化（硬件+系统层面）
+/// 逻辑：
+/// 1) 如果 sysctl kern.hv_support 存在且为 "1" -> 返回 true （Hypervisor.framework 支持）
+/// 2) 否则：如果为 x86_64 再尝试 machdep.cpu.features 是否包含 "VMX"
+/// 3) 对于 arm64，如果 framework 路径存在（Hypervisor/Virtualization）则倾向返回 true
+/// 4) 否则返回 None / false
+fn detect_virtualization_macos() -> Option<bool> {
+    // 1) 优先检查 kern.hv_support（很多工具/文档建议此项作为 Hypervisor.framework 支持指示）
+    if let Some(v) = run_sysctl_n("kern.hv_support") {
+        // 常见输出 "1" 或 "0"；也有工具返回 "kern.hv_support: 1" 的情形，但 -n 已去掉前缀
+        if v == "1" {
+            return Some(true);
+        } else if v == "0" {
+            // 明确不支持
+            return Some(false);
+        }
+        // 若 v 不为 0/1，继续后备检测
+    }
+
+    // 2) 读取架构判断
+    let arch = std::env::consts::ARCH.to_string(); // "x86_64" 或 "aarch64" 等
+    let arch_lower = arch.to_ascii_lowercase();
+
+    // 3) x86 特殊处理：检查 machdep.cpu.features 是否含 VMX（Intel VT-x）
+    if arch_lower.contains("x86") || arch_lower.contains("amd64") {
+        if let Some(features) = run_sysctl_n("machdep.cpu.features") {
+            if features.to_ascii_uppercase().contains("VMX") {
+                return Some(true);
+            } else {
+                return Some(false);
+            }
+        } else {
+            // machdep.cpu.features 读取失败 -> 不确定
+            return None;
+        }
+    }
+
+    // 4) arm64/Apple Silicon：检查 Hypervisor / Virtualization framework 是否存在（作为特征性线索）
+    if arch_lower.contains("aarch64") || arch_lower.contains("arm") || arch_lower.contains("arm64")
+    {
+        // 两个常见 framework 路径
+        let hv_path = Path::new("/System/Library/Frameworks/Hypervisor.framework");
+        let virt_path = Path::new("/System/Library/Frameworks/Virtualization.framework");
+        if hv_path.exists() || virt_path.exists() {
+            // framework 存在通常意味着系统支持 Hypervisor / Virtualization API（硬件也通常支持 Apple 的虚拟化扩展）
+            return Some(true);
+        } else {
+            // framework 不存在或不可访问 -> 不确定
+            return None;
+        }
+    }
+
+    // 5) 若都没命中 -> 无法判断
+    None
 }
 
 /// 主命令：在 async 上下文中调用 spawn_blocking
@@ -1040,19 +1147,59 @@ async fn get_cpu_info() -> Result<CpuInfo, String> {
     }
 }
 
-fn fetch_cpu_info_blocking() -> anyhow::Result<CpuInfo> {
-    // helper: run sysctl -n <key> and return trimmed stdout
-    let run_sysctl = |key: &str| -> Option<String> {
-        if let Ok(out) = Command::new("sysctl").arg("-n").arg(key).output() {
-            if out.status.success() {
-                if let Ok(s) = String::from_utf8(out.stdout) {
-                    return Some(s.trim().to_string());
+pub fn get_cpu_usage_from_top() -> Result<(f64, Option<Vec<f64>>), String> {
+    // 调用 top 命令
+    let output = Command::new("top")
+        .args(&["-l", "2", "-n", "0", "-stats", "cpu"])
+        .output()
+        .map_err(|e| format!("执行 top 命令失败: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!("top 执行失败: {:?}", output.status.code()));
+    }
+
+    let txt =
+        String::from_utf8(output.stdout).map_err(|_| "top 输出不是有效的 UTF-8".to_string())?;
+
+    // 找最后一个 "CPU usage:" 行
+    if let Some(pos) = txt.rfind("CPU usage:") {
+        if let Some(line) = txt[pos..].lines().next() {
+            // 匹配 idle 百分比
+            let re_idle = Regex::new(r"([0-9]+\.[0-9]+)%\s*idle")
+                .map_err(|e| format!("regex 编译失败: {}", e))?;
+
+            if let Some(cap) = re_idle.captures(line) {
+                if let Ok(idle_v) = cap[1].parse::<f64>() {
+                    let total = (100.0 - idle_v).max(0.0);
+                    return Ok((total, None));
                 }
             }
-        }
-        None
-    };
 
+            // 如果没有 idle，就尝试解析 user+sys
+            let re_user = Regex::new(r"([0-9]+\.[0-9]+)%\s*user")
+                .map_err(|e| format!("regex 编译失败: {}", e))?;
+            let re_sys = Regex::new(r"([0-9]+\.[0-9]+)%\s*sys")
+                .map_err(|e| format!("regex 编译失败: {}", e))?;
+
+            let user_v = re_user
+                .captures(line)
+                .and_then(|c| c.get(1))
+                .and_then(|m| m.as_str().parse::<f64>().ok())
+                .unwrap_or(0.0);
+            let sys_v = re_sys
+                .captures(line)
+                .and_then(|c| c.get(1))
+                .and_then(|m| m.as_str().parse::<f64>().ok())
+                .unwrap_or(0.0);
+
+            return Ok((user_v + sys_v, None));
+        }
+    }
+
+    Err("未找到 CPU usage 行".into())
+}
+
+fn fetch_cpu_info_blocking() -> anyhow::Result<CpuInfo> {
     // collect a set of helpful sysctl keys (non-fatal)
     let keys = [
         "machdep.cpu.brand_string",
@@ -1072,7 +1219,7 @@ fn fetch_cpu_info_blocking() -> anyhow::Result<CpuInfo> {
     ];
     let mut sysctl_map = std::collections::HashMap::new();
     for k in &keys {
-        if let Some(v) = run_sysctl(k) {
+        if let Some(v) = run_sysctl_n(k) {
             sysctl_map.insert(k.to_string(), v);
         }
     }
@@ -1084,10 +1231,15 @@ fn fetch_cpu_info_blocking() -> anyhow::Result<CpuInfo> {
         .or_else(|| sysctl_map.get("hw.model").cloned())
         .or_else(|| sysctl_map.get("hw.machine").cloned());
 
-    let architecture = run_sysctl("uname -m")
-        .or_else(|| run_sysctl("hw.machine_arch"))
+    let architecture = run_sysctl_n("uname -m")
+        .or_else(|| run_sysctl_n("hw.machine_arch"))
         // fallback: use std::env
         .or_else(|| Some(std::env::consts::ARCH.to_string()));
+
+    let packages = run_sysctl_n("hw.packages")
+        .and_then(|s| s.parse::<u32>().ok())
+        // fallback: 如果 hw.packages 不存在，可以在 macOS 上保守设为 1 （绝大多数情况）
+        .or_else(|| Some(1));
 
     // parse cores/freq
     let physical_cores = sysctl_map
@@ -1153,57 +1305,65 @@ fn fetch_cpu_info_blocking() -> anyhow::Result<CpuInfo> {
         }
     };
 
+    let (cpu_usage_percent, per_core_vec) = match get_cpu_usage_from_top() {
+        Ok((val, per_core)) => (Some(val), per_core),
+        Err(e) => {
+            log::warn!("get_cpu_usage_from_top failed: {}", e);
+            (None, None)
+        }
+    };
+
     // Approx total cpu usage %: do a quick sampling of `top -l 2 -n 0 -stats cpu` or `ps` as fallback
     // We'll try to call "top -l 2 -n 0 -stats cpu" and parse the "CPU usage:" line from the second sample (macOS top outputs two samples; first is since boot)
-    let (cpu_usage_percent, per_core_vec) = {
-        // attempt top approach
-        let mut total_cpu_pct: Option<f64> = None;
-        let mut per_core: Option<Vec<f64>> = None;
+    // let (cpu_usage_percent, per_core_vec) = {
+    //     // attempt top approach
+    //     let mut total_cpu_pct: Option<f64> = None;
+    //     let mut per_core: Option<Vec<f64>> = None;
 
-        if let Ok(out) = Command::new("top")
-            .args(&["-l", "2", "-n", "0", "-stats", "cpu"])
-            .output()
-        {
-            if out.status.success() {
-                if let Ok(txt) = String::from_utf8(out.stdout) {
-                    // find the last occurrence of "CPU usage:"
-                    // example line: "CPU usage: 6.43% user, 11.14% sys, 82.42% idle"
-                    if let Some(pos) = txt.rfind("CPU usage:") {
-                        if let Some(line) = txt[pos..].lines().next() {
-                            // parse user+sys and compute busy% = 100 - idle%
-                            let re_idle = regex::Regex::new(r"([0-9]+\.[0-9]+)%\s*idle").unwrap();
-                            if let Some(cap) = re_idle.captures(line) {
-                                if let Ok(idle_v) = cap.get(1).unwrap().as_str().parse::<f64>() {
-                                    total_cpu_pct = Some((100.0 - idle_v).max(0.0));
-                                }
-                            } else {
-                                // fallback: try parse user+sys
-                                let re_user =
-                                    regex::Regex::new(r"([0-9]+\.[0-9]+)%\s*user").unwrap();
-                                let re_sys = regex::Regex::new(r"([0-9]+\.[0-9]+)%\s*sys").unwrap();
-                                let user_v = re_user
-                                    .captures(line)
-                                    .and_then(|c| {
-                                        c.get(1).and_then(|m| m.as_str().parse::<f64>().ok())
-                                    })
-                                    .unwrap_or(0.0);
-                                let sys_v = re_sys
-                                    .captures(line)
-                                    .and_then(|c| {
-                                        c.get(1).and_then(|m| m.as_str().parse::<f64>().ok())
-                                    })
-                                    .unwrap_or(0.0);
-                                total_cpu_pct = Some(user_v + sys_v);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    //     if let Ok(out) = Command::new("top")
+    //         .args(&["-l", "2", "-n", "0", "-stats", "cpu"])
+    //         .output()
+    //     {
+    //         if out.status.success() {
+    //             if let Ok(txt) = String::from_utf8(out.stdout) {
+    //                 // find the last occurrence of "CPU usage:"
+    //                 // example line: "CPU usage: 6.43% user, 11.14% sys, 82.42% idle"
+    //                 if let Some(pos) = txt.rfind("CPU usage:") {
+    //                     if let Some(line) = txt[pos..].lines().next() {
+    //                         // parse user+sys and compute busy% = 100 - idle%
+    //                         let re_idle = regex::Regex::new(r"([0-9]+\.[0-9]+)%\s*idle").unwrap();
+    //                         if let Some(cap) = re_idle.captures(line) {
+    //                             if let Ok(idle_v) = cap.get(1).unwrap().as_str().parse::<f64>() {
+    //                                 total_cpu_pct = Some((100.0 - idle_v).max(0.0));
+    //                             }
+    //                         } else {
+    //                             // fallback: try parse user+sys
+    //                             let re_user =
+    //                                 regex::Regex::new(r"([0-9]+\.[0-9]+)%\s*user").unwrap();
+    //                             let re_sys = regex::Regex::new(r"([0-9]+\.[0-9]+)%\s*sys").unwrap();
+    //                             let user_v = re_user
+    //                                 .captures(line)
+    //                                 .and_then(|c| {
+    //                                     c.get(1).and_then(|m| m.as_str().parse::<f64>().ok())
+    //                                 })
+    //                                 .unwrap_or(0.0);
+    //                             let sys_v = re_sys
+    //                                 .captures(line)
+    //                                 .and_then(|c| {
+    //                                     c.get(1).and_then(|m| m.as_str().parse::<f64>().ok())
+    //                                 })
+    //                                 .unwrap_or(0.0);
+    //                             total_cpu_pct = Some(user_v + sys_v);
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
 
-        // per-core usage: try "sar -u" is not standard; we return None for now unless user asks for mach host_processor_info approach
-        (total_cpu_pct, per_core)
-    };
+    //     // per-core usage: try "sar -u" is not standard; we return None for now unless user asks for mach host_processor_info approach
+    //     (total_cpu_pct, per_core)
+    // };
 
     // powermetrics attempt: run powermetrics once for samplers "smc,cpu_power" (best-effort)
     let (pm_raw, cpu_temp_c) = {
@@ -1242,6 +1402,8 @@ fn fetch_cpu_info_blocking() -> anyhow::Result<CpuInfo> {
         .unwrap()
         .as_secs();
 
+    let process_stats = get_process_stats_from_top();
+
     Ok(CpuInfo {
         model_name,
         architecture,
@@ -1253,12 +1415,15 @@ fn fetch_cpu_info_blocking() -> anyhow::Result<CpuInfo> {
         loadavg_5: la5,
         loadavg_15: la15,
         uptime_seconds,
+        process_stats,
         cpu_usage_percent,
         per_core_usage_percent: per_core_vec,
         powermetrics_raw: pm_raw,
         cpu_temperature_c: cpu_temp_c,
         sysctl_map,
         timestamp_unix,
+        supports_virtualization: detect_virtualization_macos(),
+        packages,
     })
 }
 
@@ -1279,7 +1444,8 @@ pub fn run() {
             get_system_metrics,
             get_battery_info,
             get_network_status,
-            get_cpu_info
+            get_cpu_info,
+            get_cache_info,
         ])
         .setup(|app| {
             // 创建系统托盘

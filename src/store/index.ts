@@ -1,5 +1,6 @@
 import type {
   BatteryInfoType,
+  CacheInfo,
   DeviceInfoType,
   HardwareDataType,
   NetworkStatusType,
@@ -23,6 +24,8 @@ interface State {
   setNetworkStatus: (networkStatus: NetworkStatusType | null) => void;
   cpuInfo: unknown;
   setCpuInfo: (cpuInfo: unknown) => void;
+  cacheInfo: CacheInfo | null;
+  setCacheInfo: (cacheInfo: CacheInfo | null) => void;
 }
 
 const useSysStore = create<State>(set => ({
@@ -43,6 +46,8 @@ const useSysStore = create<State>(set => ({
   setNetworkStatus: networkStatus => set(() => ({ networkStatus })),
   cpuInfo: null,
   setCpuInfo: cpuInfo => set(() => ({ cpuInfo })),
+  cacheInfo: null,
+  setCacheInfo: cacheInfo => set(() => ({ cacheInfo })),
 }));
 
 export { useSysStore };

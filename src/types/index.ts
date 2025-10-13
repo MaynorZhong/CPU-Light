@@ -119,8 +119,84 @@ type NetworkStatusType = Partial<{
   public_ip: string;
 }>;
 
+type ProcessStats = Partial<{
+  total: string; // 总进程数
+  running: string; // 运行中
+  sleeping: string; // 睡眠
+  threads: string; // 线程数
+}>;
+
+type CpuInfo = Partial<{
+  model_name: string; // e.g. "Apple M4" or "Intel(R) Core(TM) i7-..."
+  architecture: string; // "arm64" / "x86_64"
+  physical_cores: number;
+  logical_cores: number;
+  cpu_frequency_hz: number; // current or typical base freq
+  cpu_frequency_max_hz: number;
+
+  // runtime / dynamic
+  loadavg_1: number;
+  loadavg_5: number;
+  loadavg_15: number;
+  uptime_seconds: number;
+
+  // totals / summary usage (best-effort)
+  cpu_usage_percent: number; // total CPU usage % (approx via sampling)
+  per_core_usage_percent: any; // optional: null if not collected
+
+  // temperature & powermetrics (optional, may be null)
+  powermetrics_raw: string; // raw output if powermetrics ran
+  cpu_temperature_c: number; // parsed or null
+
+  // other useful raw data
+  sysctl_map: Record<string, string>; // collected sysctl key -> value (for debugging)
+  timestamp_unix: number;
+  supports_virtualization: boolean;
+  packages: number;
+  process_stats: ProcessStats;
+}>;
+
+type PerflevelCacheType = Partial<{
+  l1i_bytes: number;
+  l1d_bytes: number;
+  l2_bytes: number;
+}>;
+
+type VmCacheInfo = Partial<{
+  page_filecache_min: number;
+  pageout_protected_sharedcache: number;
+  pageout_forcereclaimed_sharedcache: number;
+  apple_protect_pager_cache_limit: number;
+  pagesize_bytes: number;
+  pages_active_bytes: number;
+  pages_inactive_bytes: number;
+  pages_free_bytes: number;
+}>;
+
+type CacheInfo = Partial<{
+  cache_line_bytes: number;
+  cache_l1i_bytes: number;
+  cache_l1d_bytes: number;
+  cache_l2_bytes: number;
+  cache_l3_bytes: number;
+
+  // perflevel indexed caches (e.g. perflevel0, perflevel1)
+  perflevel: any;
+
+  // raw arrays for advanced debugging
+  cache_sizes_raw: number[];
+  cache_config_raw: number[];
+
+  // vm / page-cache related (dynamic / optional)
+  vm_cache: VmCacheInfo | null;
+
+  // debug: store other sysctl key->value pairs that are cache-related but not shown in overview
+  debug_sysctls: Record<string, string>;
+}>;
+
 export type {
   SysInfoType,
+  CpuInfo,
   MacOSMapEntry,
   DeviceInfoType,
   SystemMetrics,
@@ -131,4 +207,7 @@ export type {
   InterfaceType,
   WifiInfoType,
   NetworkStatusType,
+  PerflevelCacheType,
+  VmCacheInfo,
+  CacheInfo,
 };

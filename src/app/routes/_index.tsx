@@ -97,7 +97,7 @@ function Home() {
 
     const id = window.setInterval(() => {
       getSystemMetricsExecutor().then(res => {
-        // console.log("get_system_metrics", res);
+        console.log("get_system_metrics", res);
         setSystemMetrics(res as SystemMetrics);
       });
       getBatteryInfoExecutor().then(res => {
