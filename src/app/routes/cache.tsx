@@ -29,8 +29,10 @@ const Cache: FC<CacheProps> = props => {
   return (
     <>
       <CacheTable>
-        <CacheTable.L1 />
-        <CacheTable.L2 />
+        <CacheTable.Perflevel />
+        <CacheTable.CPU />
+        <CacheTable.VM />
+        <CacheTable.Debug />
       </CacheTable>
     </>
   );
