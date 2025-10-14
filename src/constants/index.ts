@@ -7,6 +7,7 @@ import {
   IconFingerprint,
   IconDeviceSdCard,
   IconArtboard,
+  IconBattery3Filled,
 } from "@tabler/icons-react";
 
 type NavConfig = {
@@ -24,6 +25,12 @@ const NAV_CONFIG = [
     key: "home",
     link: "/",
     icon: IconWorldCog,
+  },
+  {
+    label: "电池",
+    key: "battery",
+    link: "/battery",
+    icon: IconBattery3Filled,
   },
   {
     label: "处理器",

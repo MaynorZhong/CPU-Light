@@ -1,4 +1,4 @@
-export const formatSecindsToDHMS = (seconds: number): string => {
+export const formatSecondsToDHMS = (seconds: number): string => {
   const d = Math.floor(seconds / (3600 * 24));
   const h = Math.floor((seconds % (3600 * 24)) / 3600);
   const m = Math.floor((seconds % 3600) / 60);

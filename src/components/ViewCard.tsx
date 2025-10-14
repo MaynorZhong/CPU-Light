@@ -12,6 +12,7 @@ type ViewCardProps = {
   title?: string;
   icon?: ReactNode;
   headerClass?: React.CSSProperties | undefined;
+  isCollapsed?: boolean;
 };
 
 const ViewCard: FC<ViewCardProps> = props => {
@@ -25,6 +26,7 @@ const ViewCard: FC<ViewCardProps> = props => {
     icon,
     title = "",
     headerClass,
+    isCollapsed = false,
   } = props;
 
   const calcWidth = useMemo(() => {
@@ -76,9 +78,11 @@ const ViewCard: FC<ViewCardProps> = props => {
             <div className="h-full">{extra}</div>
           </Flex>
         </Card.Section>
-        <Card.Section mt="sm">
-          <div className="px-3 pb-3">{children}</div>
-        </Card.Section>
+        {!isCollapsed && (
+          <Card.Section mt="sm">
+            <div className="px-3 pb-3">{children}</div>
+          </Card.Section>
+        )}
       </Card>
     </motion.div>
   );

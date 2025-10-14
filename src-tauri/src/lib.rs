@@ -1,16 +1,27 @@
-use std::{collections::HashMap, process::Command, time::Duration};
+use std::{
+    collections::HashMap,
+    process::Command,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
+use nix::libc;
 use regex::Regex;
 use tauri::{path::BaseDirectory, Manager};
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::net::IpAddr;
+
 use sysinfo::{Disks, System};
 
 // 导入 tray 模块
 mod tray;
+
+mod cache_info;
+use cache_info::cache_info::get_cache_info;
+
+mod utils;
+use utils::utils::run_sysctl_n;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -232,7 +243,7 @@ struct Temps {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemMetrics {
-    cpu_usage_percent: f32, // 0.0..100.0
+    cpu_usage_percent: f64, // 0.0..100.0
     total_memory_kb: u64,
     used_memory_kb: u64,
     disks: Vec<DiskInfo>,
@@ -246,8 +257,13 @@ fn get_system_metrics() -> Result<SystemMetrics, String> {
 
     sys.refresh_all();
 
-    let cpu_usage =
-        sys.cpus().iter().map(|c| c.cpu_usage()).sum::<f32>() / (sys.cpus().len() as f32);
+    let cpu_usage_percent = match get_cpu_usage_from_top() {
+        Ok((val, _)) => val,
+        Err(e) => {
+            log::warn!("get_cpu_usage_from_top failed: {}", e);
+            0.0
+        }
+    };
 
     sys.refresh_all();
 
@@ -280,7 +296,7 @@ fn get_system_metrics() -> Result<SystemMetrics, String> {
     let temps = macos_try_get_temps();
 
     Ok(SystemMetrics {
-        cpu_usage_percent: cpu_usage,
+        cpu_usage_percent,
         total_memory_kb: total_memory,
         used_memory_kb: used_memory,
         disks,
@@ -497,7 +513,6 @@ fn fetch_battery_macos() -> anyhow::Result<BatteryInfo> {
         }
     }
 
-    println!("pmset output: {}", pm_stdout);
     if pm_stdout
         .to_lowercase()
         .contains("now drawing from 'ac power'")
@@ -690,9 +705,7 @@ pub struct MacNetworkStatus {
 }
 
 #[tauri::command]
-async fn get_network_status_macos(
-    include_public_ip: Option<bool>,
-) -> Result<MacNetworkStatus, String> {
+async fn get_network_status(include_public_ip: Option<bool>) -> Result<MacNetworkStatus, String> {
     let include_public = include_public_ip.unwrap_or(false);
     fetch_network_status_macos(include_public)
         .await
@@ -701,6 +714,7 @@ async fn get_network_status_macos(
 
 // ---------- 主逻辑 (async) ----------
 async fn fetch_network_status_macos(include_public: bool) -> anyhow::Result<MacNetworkStatus> {
+    println!("include_public {:?}", include_public);
     let interfaces = gather_interfaces_via_ifconfig().context("gather interfaces failed")?;
     let wifi = get_wifi_info().ok().flatten();
     let default_gateway = get_default_gateway().ok().flatten();
@@ -824,50 +838,111 @@ fn gather_interfaces_via_ifconfig() -> anyhow::Result<Vec<InterfaceInfo>> {
     Ok(interfaces)
 }
 
-// ---------- wifi (airport -I) ----------
+// 使用 scutil --nwi + networksetup -getairportnetwork <iface> 的实现
 fn get_wifi_info() -> anyhow::Result<Option<WifiInfo>> {
-    let airport_path =
-        "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport";
-    if !std::path::Path::new(airport_path).exists() {
-        return Ok(None);
-    }
-
-    let out = Command::new(airport_path)
-        .arg("-I")
+    // 1) 先用 scutil --nwi 找出 primary interface（比如 en0/en1）
+    let scutil_out = Command::new("scutil")
+        .arg("--nwi")
         .output()
-        .context("running airport")?;
-    if !out.status.success() {
+        .context("running scutil --nwi")?;
+
+    if !scutil_out.status.success() {
         return Ok(None);
     }
-    let s = String::from_utf8_lossy(&out.stdout);
+    let sc = String::from_utf8_lossy(&scutil_out.stdout);
 
-    let ssid = Regex::new(r"(?m)^\s*SSID:\s*(.+)$")
-        .unwrap()
-        .captures_iter(&s)
-        .next()
-        .and_then(|c| c.get(1).map(|m| m.as_str().trim().to_string()));
-    let bssid = Regex::new(r"(?m)^\s*BSSID:\s*([0-9a-fA-F:]{17})")
-        .unwrap()
-        .captures_iter(&s)
-        .next()
-        .and_then(|c| c.get(1).map(|m| m.as_str().to_string()));
-    let signal = Regex::new(r"(?m)^\s*agrCtlRSSI:\s*(-?\d+)")
-        .unwrap()
-        .captures_iter(&s)
-        .next()
-        .and_then(|c| c.get(1).and_then(|m| m.as_str().parse::<i32>().ok()));
-    let iface = Regex::new(r"(?m)^\s*interface:\s*(\w+)")
-        .unwrap()
-        .captures_iter(&s)
-        .next()
+    // 常见行: "primary interface: en0"
+    let re_primary = Regex::new(r"(?mi)primary interface:\s*([0-9A-Za-z._-]+)").unwrap();
+    let primary_iface = re_primary
+        .captures(&sc)
         .and_then(|c| c.get(1).map(|m| m.as_str().to_string()));
 
+    // 如果 scutil 没给出 primary interface，尝试用 "PrimaryInterface"（某些 macOS 版本/语言）
+    let primary_iface = primary_iface.or_else(|| {
+        let re2 = Regex::new(r"(?mi)PrimaryInterface\s*:\s*([0-9A-Za-z._-]+)").unwrap();
+        re2.captures(&sc)
+            .and_then(|c| c.get(1).map(|m| m.as_str().to_string()))
+    });
+
+    // 2) 如果拿到接口名，调用 networksetup -getairportnetwork <iface> 获取 SSID
+    let mut ssid: Option<String> = None;
+    let mut iface_name: Option<String> = primary_iface.clone();
+
+    if let Some(iface) = primary_iface {
+        // networksetup -getairportnetwork <iface>
+        let out = Command::new("networksetup")
+            .arg("-getairportnetwork")
+            .arg(&iface)
+            .output()
+            .context("running networksetup -getairportnetwork")?;
+
+        if out.status.success() {
+            let s = String::from_utf8_lossy(&out.stdout);
+            // 成功样例: "Current Wi-Fi Network: MySSID"
+            if let Some(cap) = Regex::new(r"(?mi)Current Wi-?Fi Network:\s*(.+)$")
+                .unwrap()
+                .captures(&s)
+            {
+                let v = cap.get(1).unwrap().as_str().trim().to_string();
+                if !v.is_empty() {
+                    ssid = Some(v);
+                }
+            } else {
+                // 另一种样例: "You are not associated with an AirPort network."
+                // 则 ssid 保持 None
+            }
+        } else {
+            // networksetup 可能在某些系统版本需要不同权限；若失败，不立刻返回失败，后面再尝试 fallback
+            iface_name = Some(iface); // keep iface anyway
+        }
+    }
+
+    // 3) fallback：如果没有 primary iface 或 networksetup 失败，尝试找所有 en* 接口并对每个调用 networksetup
+    if ssid.is_none() {
+        // 用 ifconfig -a 找到可能的 wifi 接口（en0/en1/en2），按常见顺序尝试
+        if let Ok(out_if) = Command::new("ifconfig").arg("-a").output() {
+            if out_if.status.success() {
+                let txt = String::from_utf8_lossy(&out_if.stdout);
+                // 找所有以 en 开头的接口名
+                let re_iface = Regex::new(r"(?m)^([en][0-9]+):").unwrap();
+                for cap in re_iface.captures_iter(&txt) {
+                    if let Some(ifn) = cap.get(1) {
+                        let cand = ifn.as_str();
+                        // call networksetup -getairportnetwork <cand>
+                        if let Ok(out2) = Command::new("networksetup")
+                            .arg("-getairportnetwork")
+                            .arg(cand)
+                            .output()
+                        {
+                            if out2.status.success() {
+                                let s = String::from_utf8_lossy(&out2.stdout);
+                                if let Some(cap2) =
+                                    Regex::new(r"(?mi)Current Wi-?Fi Network:\s*(.+)$")
+                                        .unwrap()
+                                        .captures(&s)
+                                {
+                                    let v = cap2.get(1).unwrap().as_str().trim().to_string();
+                                    if !v.is_empty() {
+                                        ssid = Some(v);
+                                        iface_name = Some(cand.to_string());
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 4) 返回 WifiInfo：此方案只能保证 SSID + iface，BSSID/RSSI/frequency 无法通过 networksetup 获取 -> 返回 None
     Ok(Some(WifiInfo {
         ssid,
-        bssid,
-        signal_dbm: signal,
+        bssid: None,
+        signal_dbm: None,
         frequency_mhz: None,
-        iface,
+        iface: iface_name,
     }))
 }
 
@@ -918,15 +993,438 @@ fn is_online_simple() -> bool {
 
 // ---------- public ip (optional) ----------
 async fn get_public_ip() -> anyhow::Result<String> {
-    #[derive(serde::Deserialize)]
+    #[derive(serde::Deserialize, Debug)]
     struct Ipify {
         ip: String,
     }
-    let res_ip = reqwest::get("https://api64.ipify.org?format=json")
-        .await?
-        .json::<Ipify>()
-        .await?;
+    use std::time::Instant;
+    let now = Instant::now();
+    let resp = reqwest::get("https://api64.ipify.org?format=json").await;
+    eprintln!(
+        "reqwest get result: {:?}, elapsed: {:?}",
+        resp,
+        now.elapsed()
+    );
+    let res_ip = resp?.json::<Ipify>().await?;
+    eprintln!("json parsed: {:?}", res_ip);
+
     Ok(res_ip.ip)
+}
+
+#[derive(Serialize)]
+pub struct CpuInfo {
+    // static / descriptive
+    pub model_name: Option<String>, // e.g. "Apple M4" or "Intel(R) Core(TM) i7-..."
+    pub architecture: Option<String>, // "arm64" / "x86_64"
+    pub physical_cores: Option<u32>,
+    pub logical_cores: Option<u32>,
+    pub cpu_frequency_hz: Option<u64>, // current or typical base freq
+    pub cpu_frequency_max_hz: Option<u64>,
+
+    // runtime / dynamic
+    pub loadavg_1: f64,
+    pub loadavg_5: f64,
+    pub loadavg_15: f64,
+    pub uptime_seconds: Option<u64>,
+
+    // totals / summary usage (best-effort)
+    pub cpu_usage_percent: Option<f64>, // total CPU usage % (approx via sampling)
+    pub per_core_usage_percent: Option<Vec<f64>>, // optional: null if not collected
+
+    // temperature & powermetrics (optional, may be null)
+    pub powermetrics_raw: Option<String>, // raw output if powermetrics ran
+    pub cpu_temperature_c: Option<f32>,   // parsed or null
+
+    // other useful raw data
+    pub sysctl_map: std::collections::HashMap<String, String>, // collected sysctl key -> value (for debugging)
+    pub timestamp_unix: u64,
+    pub supports_virtualization: Option<bool>,
+    pub packages: Option<u32>,
+    pub process_stats: Option<ProcessStats>,
+}
+
+#[derive(Serialize)]
+pub struct ProcessStats {
+    pub total: Option<u32>,    // 总进程数
+    pub running: Option<u32>,  // 运行中
+    pub sleeping: Option<u32>, // 睡眠
+    pub threads: Option<u32>,  // 线程数
+}
+
+use std::path::Path;
+
+fn get_process_stats_from_top() -> Option<ProcessStats> {
+    let output = Command::new("top")
+        .args(&["-l", "1", "-n", "0"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let txt = String::from_utf8_lossy(&output.stdout);
+    let re = Regex::new(
+        r"Processes:\s*(\d+)\s+total,\s*(\d+)\s+running,\s*(\d+)\s+sleeping,\s*(\d+)\s+threads",
+    )
+    .ok()?;
+
+    if let Some(cap) = re.captures(&txt) {
+        Some(ProcessStats {
+            total: cap.get(1).and_then(|m| m.as_str().parse().ok()),
+            running: cap.get(2).and_then(|m| m.as_str().parse().ok()),
+            sleeping: cap.get(3).and_then(|m| m.as_str().parse().ok()),
+            threads: cap.get(4).and_then(|m| m.as_str().parse().ok()),
+        })
+    } else {
+        None
+    }
+}
+
+/// macOS: 检测是否支持虚拟化（硬件+系统层面）
+/// 逻辑：
+/// 1) 如果 sysctl kern.hv_support 存在且为 "1" -> 返回 true （Hypervisor.framework 支持）
+/// 2) 否则：如果为 x86_64 再尝试 machdep.cpu.features 是否包含 "VMX"
+/// 3) 对于 arm64，如果 framework 路径存在（Hypervisor/Virtualization）则倾向返回 true
+/// 4) 否则返回 None / false
+fn detect_virtualization_macos() -> Option<bool> {
+    // 1) 优先检查 kern.hv_support（很多工具/文档建议此项作为 Hypervisor.framework 支持指示）
+    if let Some(v) = run_sysctl_n("kern.hv_support") {
+        // 常见输出 "1" 或 "0"；也有工具返回 "kern.hv_support: 1" 的情形，但 -n 已去掉前缀
+        if v == "1" {
+            return Some(true);
+        } else if v == "0" {
+            // 明确不支持
+            return Some(false);
+        }
+        // 若 v 不为 0/1，继续后备检测
+    }
+
+    // 2) 读取架构判断
+    let arch = std::env::consts::ARCH.to_string(); // "x86_64" 或 "aarch64" 等
+    let arch_lower = arch.to_ascii_lowercase();
+
+    // 3) x86 特殊处理：检查 machdep.cpu.features 是否含 VMX（Intel VT-x）
+    if arch_lower.contains("x86") || arch_lower.contains("amd64") {
+        if let Some(features) = run_sysctl_n("machdep.cpu.features") {
+            if features.to_ascii_uppercase().contains("VMX") {
+                return Some(true);
+            } else {
+                return Some(false);
+            }
+        } else {
+            // machdep.cpu.features 读取失败 -> 不确定
+            return None;
+        }
+    }
+
+    // 4) arm64/Apple Silicon：检查 Hypervisor / Virtualization framework 是否存在（作为特征性线索）
+    if arch_lower.contains("aarch64") || arch_lower.contains("arm") || arch_lower.contains("arm64")
+    {
+        // 两个常见 framework 路径
+        let hv_path = Path::new("/System/Library/Frameworks/Hypervisor.framework");
+        let virt_path = Path::new("/System/Library/Frameworks/Virtualization.framework");
+        if hv_path.exists() || virt_path.exists() {
+            // framework 存在通常意味着系统支持 Hypervisor / Virtualization API（硬件也通常支持 Apple 的虚拟化扩展）
+            return Some(true);
+        } else {
+            // framework 不存在或不可访问 -> 不确定
+            return None;
+        }
+    }
+
+    // 5) 若都没命中 -> 无法判断
+    None
+}
+
+/// 主命令：在 async 上下文中调用 spawn_blocking
+#[tauri::command]
+async fn get_cpu_info() -> Result<CpuInfo, String> {
+    let res = tauri::async_runtime::spawn_blocking(move || fetch_cpu_info_blocking()).await;
+    match res {
+        Ok(Ok(info)) => Ok(info),
+        Ok(Err(e)) => Err(format!("fetch cpu info error: {:?}", e)),
+        Err(e) => Err(format!("task join error: {:?}", e)),
+    }
+}
+
+pub fn get_cpu_usage_from_top() -> Result<(f64, Option<Vec<f64>>), String> {
+    // 调用 top 命令
+    let output = Command::new("top")
+        .args(&["-l", "2", "-n", "0", "-stats", "cpu"])
+        .output()
+        .map_err(|e| format!("执行 top 命令失败: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!("top 执行失败: {:?}", output.status.code()));
+    }
+
+    let txt =
+        String::from_utf8(output.stdout).map_err(|_| "top 输出不是有效的 UTF-8".to_string())?;
+
+    // 找最后一个 "CPU usage:" 行
+    if let Some(pos) = txt.rfind("CPU usage:") {
+        if let Some(line) = txt[pos..].lines().next() {
+            // 匹配 idle 百分比
+            let re_idle = Regex::new(r"([0-9]+\.[0-9]+)%\s*idle")
+                .map_err(|e| format!("regex 编译失败: {}", e))?;
+
+            if let Some(cap) = re_idle.captures(line) {
+                if let Ok(idle_v) = cap[1].parse::<f64>() {
+                    let total = (100.0 - idle_v).max(0.0);
+                    return Ok((total, None));
+                }
+            }
+
+            // 如果没有 idle，就尝试解析 user+sys
+            let re_user = Regex::new(r"([0-9]+\.[0-9]+)%\s*user")
+                .map_err(|e| format!("regex 编译失败: {}", e))?;
+            let re_sys = Regex::new(r"([0-9]+\.[0-9]+)%\s*sys")
+                .map_err(|e| format!("regex 编译失败: {}", e))?;
+
+            let user_v = re_user
+                .captures(line)
+                .and_then(|c| c.get(1))
+                .and_then(|m| m.as_str().parse::<f64>().ok())
+                .unwrap_or(0.0);
+            let sys_v = re_sys
+                .captures(line)
+                .and_then(|c| c.get(1))
+                .and_then(|m| m.as_str().parse::<f64>().ok())
+                .unwrap_or(0.0);
+
+            return Ok((user_v + sys_v, None));
+        }
+    }
+
+    Err("未找到 CPU usage 行".into())
+}
+
+fn fetch_cpu_info_blocking() -> anyhow::Result<CpuInfo> {
+    // collect a set of helpful sysctl keys (non-fatal)
+    let keys = [
+        "machdep.cpu.brand_string",
+        "machdep.cpu.model",
+        "machdep.cpu.family",
+        "machdep.cpu.vendor",
+        "hw.machine",
+        "hw.model",
+        "hw.physicalcpu", // physical cores
+        "hw.physicalcpu_max",
+        "hw.logicalcpu", // logical cores (threads)
+        "hw.logicalcpu_max",
+        "hw.cpufrequency", // Hz
+        "hw.cpufrequency_max",
+        "hw.cputype",
+        "hw.machine_arch",
+    ];
+    let mut sysctl_map = std::collections::HashMap::new();
+    for k in &keys {
+        if let Some(v) = run_sysctl_n(k) {
+            sysctl_map.insert(k.to_string(), v);
+        }
+    }
+
+    // model name heuristic
+    let model_name = sysctl_map
+        .get("machdep.cpu.brand_string")
+        .cloned()
+        .or_else(|| sysctl_map.get("hw.model").cloned())
+        .or_else(|| sysctl_map.get("hw.machine").cloned());
+
+    let architecture = run_sysctl_n("uname -m")
+        .or_else(|| run_sysctl_n("hw.machine_arch"))
+        // fallback: use std::env
+        .or_else(|| Some(std::env::consts::ARCH.to_string()));
+
+    let packages = run_sysctl_n("hw.packages")
+        .and_then(|s| s.parse::<u32>().ok())
+        // fallback: 如果 hw.packages 不存在，可以在 macOS 上保守设为 1 （绝大多数情况）
+        .or_else(|| Some(1));
+
+    // parse cores/freq
+    let physical_cores = sysctl_map
+        .get("hw.physicalcpu")
+        .and_then(|s| s.parse::<u32>().ok());
+    let logical_cores = sysctl_map
+        .get("hw.logicalcpu")
+        .and_then(|s| s.parse::<u32>().ok());
+    let cpu_freq = sysctl_map
+        .get("hw.cpufrequency")
+        .and_then(|s| s.parse::<u64>().ok());
+    let cpu_freq_max = sysctl_map
+        .get("hw.cpufrequency_max")
+        .and_then(|s| s.parse::<u64>().ok());
+
+    // load averages via libc getloadavg
+    let mut loads = [0f64; 3];
+    let n = unsafe { libc::getloadavg(loads.as_mut_ptr(), 3) };
+    let (la1, la5, la15) = if n == 3 {
+        (loads[0], loads[1], loads[2])
+    } else {
+        (0.0, 0.0, 0.0)
+    };
+
+    // uptime: use sysctl kern.boottime -> compute seconds since boot
+    let uptime_seconds = {
+        // call sysctl -n kern.boottime and parse like: { sec = 169... , usec = 0 } Wed ...
+        let out = Command::new("sysctl")
+            .arg("-n")
+            .arg("kern.boottime")
+            .output()
+            .ok();
+        if let Some(o) = out {
+            if o.status.success() {
+                if let Ok(s) = String::from_utf8(o.stdout) {
+                    // try capture sec = NUM
+                    let re = regex::Regex::new(r"sec\s*=\s*(\d+)").unwrap();
+                    if let Some(cap) = re.captures(&s) {
+                        if let Ok(sec) = cap.get(1).unwrap().as_str().parse::<u64>() {
+                            let now = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs();
+                            if now >= sec {
+                                Some(now - sec)
+                            } else {
+                                Some(0)
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+
+    let (cpu_usage_percent, per_core_vec) = match get_cpu_usage_from_top() {
+        Ok((val, per_core)) => (Some(val), per_core),
+        Err(e) => {
+            log::warn!("get_cpu_usage_from_top failed: {}", e);
+            (None, None)
+        }
+    };
+
+    // Approx total cpu usage %: do a quick sampling of `top -l 2 -n 0 -stats cpu` or `ps` as fallback
+    // We'll try to call "top -l 2 -n 0 -stats cpu" and parse the "CPU usage:" line from the second sample (macOS top outputs two samples; first is since boot)
+    // let (cpu_usage_percent, per_core_vec) = {
+    //     // attempt top approach
+    //     let mut total_cpu_pct: Option<f64> = None;
+    //     let mut per_core: Option<Vec<f64>> = None;
+
+    //     if let Ok(out) = Command::new("top")
+    //         .args(&["-l", "2", "-n", "0", "-stats", "cpu"])
+    //         .output()
+    //     {
+    //         if out.status.success() {
+    //             if let Ok(txt) = String::from_utf8(out.stdout) {
+    //                 // find the last occurrence of "CPU usage:"
+    //                 // example line: "CPU usage: 6.43% user, 11.14% sys, 82.42% idle"
+    //                 if let Some(pos) = txt.rfind("CPU usage:") {
+    //                     if let Some(line) = txt[pos..].lines().next() {
+    //                         // parse user+sys and compute busy% = 100 - idle%
+    //                         let re_idle = regex::Regex::new(r"([0-9]+\.[0-9]+)%\s*idle").unwrap();
+    //                         if let Some(cap) = re_idle.captures(line) {
+    //                             if let Ok(idle_v) = cap.get(1).unwrap().as_str().parse::<f64>() {
+    //                                 total_cpu_pct = Some((100.0 - idle_v).max(0.0));
+    //                             }
+    //                         } else {
+    //                             // fallback: try parse user+sys
+    //                             let re_user =
+    //                                 regex::Regex::new(r"([0-9]+\.[0-9]+)%\s*user").unwrap();
+    //                             let re_sys = regex::Regex::new(r"([0-9]+\.[0-9]+)%\s*sys").unwrap();
+    //                             let user_v = re_user
+    //                                 .captures(line)
+    //                                 .and_then(|c| {
+    //                                     c.get(1).and_then(|m| m.as_str().parse::<f64>().ok())
+    //                                 })
+    //                                 .unwrap_or(0.0);
+    //                             let sys_v = re_sys
+    //                                 .captures(line)
+    //                                 .and_then(|c| {
+    //                                     c.get(1).and_then(|m| m.as_str().parse::<f64>().ok())
+    //                                 })
+    //                                 .unwrap_or(0.0);
+    //                             total_cpu_pct = Some(user_v + sys_v);
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+
+    //     // per-core usage: try "sar -u" is not standard; we return None for now unless user asks for mach host_processor_info approach
+    //     (total_cpu_pct, per_core)
+    // };
+
+    // powermetrics attempt: run powermetrics once for samplers "smc,cpu_power" (best-effort)
+    let (pm_raw, cpu_temp_c) = {
+        let pm_path = "/usr/bin/powermetrics";
+        if std::path::Path::new(pm_path).exists() {
+            // run with -n1 to sample once; samplers list may vary across OS versions
+            // note: powermetrics may require root or extra entitlements to return some fields.
+            match Command::new(pm_path)
+                .args(&["--samplers", "smc,cpu_power", "-n", "1"])
+                .output()
+            {
+                Ok(out) => {
+                    if out.status.success() {
+                        let raw = String::from_utf8_lossy(&out.stdout).to_string();
+                        // Try to extract a CPU temp heuristic: search for "CPU die temperature: 45.12 C" or "package temperature: 45.12 C"
+                        let re_temp = regex::Regex::new(r"(?i)(?:cpu die temperature|package temperature|core \d+ temperature)\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*C").unwrap();
+                        let temp = re_temp
+                            .captures(&raw)
+                            .and_then(|c| c.get(1).and_then(|m| m.as_str().parse::<f32>().ok()));
+                        (Some(raw), temp)
+                    } else {
+                        // capture stderr as diagnostic
+                        let errtxt = String::from_utf8_lossy(&out.stderr).to_string();
+                        (Some(format!("powermetrics failed: {}", errtxt)), None)
+                    }
+                }
+                Err(e) => (Some(format!("powermetrics exec error: {:?}", e)), None),
+            }
+        } else {
+            (None, None)
+        }
+    };
+
+    let timestamp_unix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let process_stats = get_process_stats_from_top();
+
+    Ok(CpuInfo {
+        model_name,
+        architecture,
+        physical_cores,
+        logical_cores,
+        cpu_frequency_hz: cpu_freq,
+        cpu_frequency_max_hz: cpu_freq_max,
+        loadavg_1: la1,
+        loadavg_5: la5,
+        loadavg_15: la15,
+        uptime_seconds,
+        process_stats,
+        cpu_usage_percent,
+        per_core_usage_percent: per_core_vec,
+        powermetrics_raw: pm_raw,
+        cpu_temperature_c: cpu_temp_c,
+        sysctl_map,
+        timestamp_unix,
+        supports_virtualization: detect_virtualization_macos(),
+        packages,
+    })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -945,7 +1443,9 @@ pub fn run() {
             get_hardware_data,
             get_system_metrics,
             get_battery_info,
-            get_network_status_macos
+            get_network_status,
+            get_cpu_info,
+            get_cache_info,
         ])
         .setup(|app| {
             // 创建系统托盘
