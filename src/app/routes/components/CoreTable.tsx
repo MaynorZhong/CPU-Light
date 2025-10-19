@@ -3,7 +3,7 @@ import { useSysStore } from "@/store";
 import type { CpuInfo } from "@/types";
 import { Table } from "@mantine/core";
 import React, { type ReactNode, FC, memo } from "react";
-import { useStore } from "zustand";
+
 import { useShallow } from "zustand/shallow";
 
 type CoreTableProps = {

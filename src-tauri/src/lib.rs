@@ -23,6 +23,12 @@ use cache_info::cache_info::get_cache_info;
 mod utils;
 use utils::utils::run_sysctl_n;
 
+mod memory_info;
+use memory_info::get_memory_info;
+
+mod memory_modules;
+use memory_modules::get_memory_modules;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -1427,6 +1433,9 @@ fn fetch_cpu_info_blocking() -> anyhow::Result<CpuInfo> {
     })
 }
 
+mod logicboard_info;
+use logicboard_info::get_logicboard_info;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 初始化日志
@@ -1446,6 +1455,9 @@ pub fn run() {
             get_network_status,
             get_cpu_info,
             get_cache_info,
+            get_logicboard_info,
+            get_memory_info,
+            get_memory_modules
         ])
         .setup(|app| {
             // 创建系统托盘

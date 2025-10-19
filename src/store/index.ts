@@ -3,6 +3,9 @@ import type {
   CacheInfo,
   DeviceInfoType,
   HardwareDataType,
+  LogicBoardInfo,
+  MemoryInfoType,
+  MemoryModuleInfo,
   NetworkStatusType,
   SysInfoType,
   SystemMetrics,
@@ -26,6 +29,12 @@ interface State {
   setCpuInfo: (cpuInfo: unknown) => void;
   cacheInfo: CacheInfo | null;
   setCacheInfo: (cacheInfo: CacheInfo | null) => void;
+  logicBoardInfo: LogicBoardInfo | null;
+  setLogicBoardInfo: (logicBoardInfo: LogicBoardInfo) => void;
+  memoryInfo: MemoryInfoType | null;
+  setMemoryInfo: (memoryInfo: MemoryInfoType) => void;
+  memoryModules: MemoryModuleInfo[] | null;
+  setMemoryModules: (memoryModules: MemoryModuleInfo[]) => void;
 }
 
 const useSysStore = create<State>(set => ({
@@ -48,6 +57,12 @@ const useSysStore = create<State>(set => ({
   setCpuInfo: cpuInfo => set(() => ({ cpuInfo })),
   cacheInfo: null,
   setCacheInfo: cacheInfo => set(() => ({ cacheInfo })),
+  logicBoardInfo: null,
+  setLogicBoardInfo: logicBoardInfo => set(() => ({ logicBoardInfo })),
+  memoryInfo: null,
+  setMemoryInfo: memoryInfo => set(() => ({ memoryInfo })),
+  memoryModules: null,
+  setMemoryModules: memoryModules => set(() => ({ memoryModules })),
 }));
 
 export { useSysStore };

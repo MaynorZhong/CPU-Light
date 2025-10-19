@@ -1,5 +1,9 @@
-import React, { type ReactNode, FC, memo } from "react";
+import React, { type ReactNode, FC, memo, useEffect } from "react";
 import BoardTable from "./components/BoardTable";
+import { useTauriCommand } from "@/hooks";
+import { useSysStore } from "@/store";
+import { useShallow } from "zustand/shallow";
+import type { LogicBoardInfo } from "@/types";
 
 type MotherboardProps = {
   children?: ReactNode;
@@ -7,6 +11,19 @@ type MotherboardProps = {
 
 const Motherboard: FC<MotherboardProps> = props => {
   const { children } = props;
+
+  const { execute } = useTauriCommand("get_logicboard_info");
+
+  const { setLogicBoardInfo } = useSysStore(
+    useShallow(({ setLogicBoardInfo }) => ({ setLogicBoardInfo }))
+  );
+
+  useEffect(() => {
+    execute().then(res => {
+      console.log("Motherboard Info:", res);
+      setLogicBoardInfo(res as LogicBoardInfo);
+    });
+  }, []);
   return (
     <div>
       <BoardTable />
