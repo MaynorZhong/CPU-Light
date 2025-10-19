@@ -194,6 +194,100 @@ type CacheInfo = Partial<{
   debug_sysctls: Record<string, string>;
 }>;
 
+type LogicBoardInfo = Partial<{
+  /// 主板硬件 ID / board-id（如 Mac-742912EFDBEE19B3）
+  board_id: string;
+
+  /// 逻辑机型标识（Model Identifier），例如 "MacBookPro18,3"
+  model_identifier: string;
+
+  /// 平台 UUID（IOPlatformUUID）
+  platform_uuid: string;
+
+  /// 硬件型号（hw.model）
+  hardware_model: string;
+
+  /// 机型架构（uname -m / hw.machine）
+  machine_arch: string;
+
+  /// 芯片/处理器型号字符串（来自 system_profiler，如 "Apple M3 Pro"）
+  chip_type: string;
+
+  /// 主板序列号（Serial Number）
+  serial_number: string;
+
+  /// 固件版本（EFI / BridgeOS 等）
+  firmware_version: string;
+
+  /// 是否启用安全启动 / secure boot 信息（若可得）
+  secure_boot: string;
+
+  /// 桥接芯片（如 T2）或其他安全协处理器信息（如果可得）
+  bridge_chip: string;
+
+  /// 逻辑板代号 / board code（若能读取到）
+  logic_board_code: string;
+
+  /// 原始 system_profiler (SPHardwareDataType) 的键值表（便于调试）
+  system_profiler_raw: Record<string, string>;
+
+  /// 其它通过 ioreg / nvram / sysctl 读取到的原始键值（调试用途）
+  debug_raw: Record<string, string>;
+  sp_extras: Record<string, string>;
+}>;
+
+type MemoryInfoType = Partial<{
+  // 基本
+  total_physical_bytes: number; // hw.memsize
+  pagesize_bytes: number; // hw.pagesize
+
+  // vm_stat derived
+  pages_free_bytes: number;
+  pages_active_bytes: number;
+  pages_inactive_bytes: number;
+  pages_speculative_bytes: number;
+  pages_wired_bytes: number; // 从 vm_stat 或 top 尝试解析
+  pages_purgeable_bytes: number;
+
+  // top / physmem derived
+  used_bytes: number;
+  free_bytes: number;
+  wired_bytes: number;
+  compressor_bytes: number;
+  mem_used_percent: number;
+
+  // swap / virtual memory
+  swap_total_bytes: number;
+  swap_used_bytes: number;
+  swap_free_bytes: number;
+  swap_used_percent: number;
+
+  // paging IO counters (if available)
+  pageins: number;
+  pageouts: number;
+
+  // 原始文本用于 debug
+  vm_stat_raw: string;
+  top_physmem_line: string;
+  swapusage_raw: string;
+
+  // 其它 sysctl 原始 map（可选）
+  sysctl_map: Record<string, string>;
+}>;
+
+type MemoryModuleInfo = Partial<{
+  slot: string;
+  size_bytes: number;
+  size_readable: string;
+  mem_type: string;
+  speed_mhz: number;
+  status: string;
+  manufacturer: string;
+  part_number: string;
+  serial_number: string;
+  raw: string;
+}>;
+
 export type {
   SysInfoType,
   CpuInfo,
@@ -209,5 +303,8 @@ export type {
   NetworkStatusType,
   PerflevelCacheType,
   VmCacheInfo,
+  MemoryModuleInfo,
   CacheInfo,
+  LogicBoardInfo,
+  MemoryInfoType,
 };

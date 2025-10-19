@@ -1,6 +1,9 @@
 import { Table } from "@mantine/core";
 import React, { type ReactNode, FC, memo } from "react";
 import { Progress } from "@mantine/core";
+import { useSysStore } from "@/store";
+import { useShallow } from "zustand/shallow";
+import { byteToGB } from "@/utils/byte";
 
 type MemoryTableProps = {
   children?: ReactNode;
@@ -8,32 +11,63 @@ type MemoryTableProps = {
 
 const MemoryTable: FC<MemoryTableProps> = props => {
   const { children } = props;
+
+  const { memoryInfo } = useSysStore(
+    useShallow(({ memoryInfo }) => ({
+      memoryInfo,
+    }))
+  );
+
   return (
     <Table variant="vertical" layout="fixed">
       <Table.Tbody>
         <Table.Tr>
           <Table.Th>总内存</Table.Th>
-          <Table.Td>24GB</Table.Td>
+          <Table.Td>
+            {memoryInfo?.total_physical_bytes
+              ? (memoryInfo.total_physical_bytes / 1024 ** 3).toFixed(0) + " GB"
+              : "-"}
+          </Table.Td>
         </Table.Tr>
 
         <Table.Tr>
           <Table.Th>已用内存</Table.Th>
           <Table.Td>
             <div>
-              <span>12GB</span>
-              <Progress value={20} size="lg" className="mt-1" />
+              <span>
+                {memoryInfo?.used_bytes
+                  ? byteToGB(memoryInfo?.used_bytes) + "GB"
+                  : "-"}
+              </span>
+              <Progress
+                value={
+                  memoryInfo?.mem_used_percent
+                    ? memoryInfo?.mem_used_percent
+                    : 0
+                }
+                size="lg"
+                className="mt-1"
+              />
             </div>
           </Table.Td>
         </Table.Tr>
 
         <Table.Tr>
           <Table.Th>可用内存</Table.Th>
-          <Table.Td>11.5 GB</Table.Td>
+          <Table.Td>
+            {memoryInfo?.free_bytes
+              ? (memoryInfo.free_bytes / 1024 ** 3).toFixed(1) + " GB"
+              : "-"}
+          </Table.Td>
         </Table.Tr>
 
         <Table.Tr>
-          <Table.Th>内存类型</Table.Th>
-          <Table.Td>LPDDR5 </Table.Td>
+          <Table.Th>内存使用率</Table.Th>
+          <Table.Td>
+            {memoryInfo?.mem_used_percent
+              ? memoryInfo?.mem_used_percent.toFixed(1) + "%"
+              : 0}
+          </Table.Td>
         </Table.Tr>
       </Table.Tbody>
     </Table>
