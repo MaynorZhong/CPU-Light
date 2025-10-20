@@ -14,6 +14,9 @@ use std::fs;
 
 use sysinfo::{Disks, System};
 
+mod gpu_info;
+use gpu_info::get_gpu_info;
+
 // 导入 tray 模块
 mod tray;
 
@@ -1457,7 +1460,8 @@ pub fn run() {
             get_cache_info,
             get_logicboard_info,
             get_memory_info,
-            get_memory_modules
+            get_memory_modules,
+            get_gpu_info,
         ])
         .setup(|app| {
             // 创建系统托盘

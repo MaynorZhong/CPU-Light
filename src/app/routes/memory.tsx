@@ -1,6 +1,6 @@
 import ViewCard from "@/components/ViewCard";
 import { IconBrandOnedrive, IconDatabase } from "@tabler/icons-react";
-import React, { type ReactNode, FC, memo, useEffect } from "react";
+import React, { type ReactNode, FC, memo, useEffect, useRef } from "react";
 
 import MemoryTable from "./components/MemoryTable";
 import VirtualMemoryTable from "./components/VirtualMemoryTable";
@@ -20,6 +20,8 @@ const Memory: FC<MemoryProps> = props => {
 
   const { execute } = useTauriCommand("get_memory_info");
 
+  const intervalId = useRef<number | null>(null);
+
   const { execute: getMemoryInfoModules } =
     useTauriCommand("get_memory_modules");
 
@@ -36,15 +38,24 @@ const Memory: FC<MemoryProps> = props => {
     );
 
   useEffect(() => {
-    execute().then(res => {
-      console.log("Memory Info:", res);
-      setMemoryInfo(res as MemoryInfoType);
-    });
+    intervalId.current = window.setInterval(() => {
+      execute().then(res => {
+        console.log("Memory Info:", res);
+        setMemoryInfo(res as MemoryInfoType);
+      });
 
-    getMemoryInfoModules().then(res => {
-      console.log("Memory Modules Info:", res);
-      setMemoryModules(res as MemoryModuleInfo[]);
-    });
+      getMemoryInfoModules().then(res => {
+        console.log("Memory Modules Info:", res);
+        setMemoryModules(res as MemoryModuleInfo[]);
+      });
+    }, 3000);
+
+    return () => {
+      if (intervalId.current) {
+        clearInterval(intervalId.current);
+        intervalId.current = null;
+      }
+    };
   }, []);
   return (
     <div className="flex w-full flex-col items-center gap-4">

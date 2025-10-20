@@ -2,6 +2,7 @@ import type {
   BatteryInfoType,
   CacheInfo,
   DeviceInfoType,
+  GPUInfo,
   HardwareDataType,
   LogicBoardInfo,
   MemoryInfoType,
@@ -35,6 +36,8 @@ interface State {
   setMemoryInfo: (memoryInfo: MemoryInfoType) => void;
   memoryModules: MemoryModuleInfo[] | null;
   setMemoryModules: (memoryModules: MemoryModuleInfo[]) => void;
+  gpuInfo: GPUInfo | null;
+  setGpuInfo: (gpuInfo: GPUInfo) => void;
 }
 
 const useSysStore = create<State>(set => ({
@@ -63,6 +66,8 @@ const useSysStore = create<State>(set => ({
   setMemoryInfo: memoryInfo => set(() => ({ memoryInfo })),
   memoryModules: null,
   setMemoryModules: memoryModules => set(() => ({ memoryModules })),
+  gpuInfo: null,
+  setGpuInfo: gpuInfo => set(() => ({ gpuInfo })),
 }));
 
 export { useSysStore };

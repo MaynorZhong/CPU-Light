@@ -1,5 +1,8 @@
+import { useSysStore } from "@/store";
+import type { GPUAdapter, GPUInfo } from "@/types";
 import { Progress, Table } from "@mantine/core";
 import React, { type ReactNode, FC, memo } from "react";
+import { useShallow } from "zustand/shallow";
 
 type GPUInfoTableProps = {
   children?: ReactNode;
@@ -7,27 +10,44 @@ type GPUInfoTableProps = {
 
 const GPUInfoTable: FC<GPUInfoTableProps> = props => {
   const { children } = props;
+
+  const { gpuInfo } = useSysStore(useShallow(({ gpuInfo }) => ({ gpuInfo })));
+
+  const { adapters } = gpuInfo || {};
+
   return (
     <Table variant="vertical" layout="fixed">
       <Table.Tbody>
         <Table.Tr>
           <Table.Th>GPU型号</Table.Th>
-          <Table.Td>Apple M3 Pro (18核GPU)</Table.Td>
+          <Table.Td>
+            {adapters?.length && adapters[0]?.model ? adapters[0]?.model : "-"}
+          </Table.Td>
         </Table.Tr>
 
         <Table.Tr>
           <Table.Th>GPU核心</Table.Th>
-          <Table.Td>18核</Table.Td>
+          <Table.Td>
+            {adapters?.length && adapters[0]?.totalCores
+              ? adapters[0].totalCores
+              : "-"}
+          </Table.Td>
         </Table.Tr>
 
         <Table.Tr>
-          <Table.Th>统一内存</Table.Th>
-          <Table.Td>36 GB</Table.Td>
+          <Table.Th>供应商</Table.Th>
+          <Table.Td>
+            {adapters?.length && adapters[0]?.vendor ? adapters[0].vendor : "-"}
+          </Table.Td>
         </Table.Tr>
 
         <Table.Tr>
           <Table.Th>Metal支持</Table.Th>
-          <Table.Td>Metal 3</Table.Td>
+          <Table.Td>
+            {adapters?.length && adapters[0]?.metalFamily
+              ? adapters[0].metalFamily
+              : "-"}
+          </Table.Td>
         </Table.Tr>
       </Table.Tbody>
     </Table>

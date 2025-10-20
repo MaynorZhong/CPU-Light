@@ -24,6 +24,7 @@ const Motherboard: FC<MotherboardProps> = props => {
       setLogicBoardInfo(res as LogicBoardInfo);
     });
   }, []);
+
   return (
     <div>
       <BoardTable />
