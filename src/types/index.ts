@@ -1,3 +1,5 @@
+import type { G } from "vitest/dist/reporters-w_64AS5f.js";
+
 type SysInfoType = Partial<{
   os_name: string;
   os_version: string;
@@ -288,6 +290,40 @@ type MemoryModuleInfo = Partial<{
   raw: string;
 }>;
 
+type GPUAdapter = Partial<{
+  model: string; // Chipset Model / GPU name
+  vendor: string; // Vendor name (e.g., AMD, Intel, Apple)
+  vramBytes: number; // VRAM in bytes (if provided)
+  vramReadable: string; // e.g., "1536 MB" or "16 GB"
+  metalFamily: string; // Metal Family (e.g., Apple M series metal)
+  metalSupported: boolean; // whether Metal is supported (true/false)
+  deviceId: string; // Device ID if present
+  bus: string; // Bus type if present (e.g., PCIe)
+  raw: string; // raw block text for debugging
+  totalCores: string;
+}>;
+
+type DisplayInfo = Partial<{
+  name: string;
+  resolution: string;
+  uiLooksLike: string;
+  pixelWidth: number;
+  pixelWeight: number;
+  depth: string;
+  connectionType: string;
+  isBuiltin: boolean;
+  isMain: boolean;
+  raw: string;
+}>;
+
+type GPUInfo = Partial<{
+  adapters: GPUAdapter[];
+  displays: DisplayInfo[];
+  systemProfilerRaw: string;
+  ioregRaw: string;
+  timestampUnix: number;
+}>;
+
 export type {
   SysInfoType,
   CpuInfo,
@@ -307,4 +343,7 @@ export type {
   CacheInfo,
   LogicBoardInfo,
   MemoryInfoType,
+  GPUInfo,
+  GPUAdapter,
+  DisplayInfo,
 };

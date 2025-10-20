@@ -29,7 +29,7 @@ export function NavbarSimple() {
             <Logo className="w-10" />
             <span className="font-semibold antialiased">CPU-L</span>
           </div>
-          <Code fw={700}>v3.1.2</Code>
+          <Code fw={700}>{import.meta.env.VITE_APP_VERSION}</Code>
         </Group>
         {links}
       </div>
