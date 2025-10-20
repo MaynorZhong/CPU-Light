@@ -1,4 +1,4 @@
-import React, { type ReactNode, FC, memo, useEffect } from "react";
+import { type ReactNode, FC, memo, useEffect } from "react";
 import CacheTable from "./components/CacheTable";
 import { useSysStore } from "@/store";
 import { useTauriCommand } from "@/hooks";

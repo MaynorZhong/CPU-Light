@@ -1,6 +1,6 @@
 import ViewCard from "@/components/ViewCard";
 import { IconBrandOnedrive, IconDatabase } from "@tabler/icons-react";
-import React, { type ReactNode, FC, memo, useEffect, useRef } from "react";
+import { type ReactNode, FC, memo, useEffect, useRef } from "react";
 
 import MemoryTable from "./components/MemoryTable";
 import VirtualMemoryTable from "./components/VirtualMemoryTable";

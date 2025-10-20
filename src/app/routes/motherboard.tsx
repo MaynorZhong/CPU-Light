@@ -1,4 +1,4 @@
-import React, { type ReactNode, FC, memo, useEffect } from "react";
+import { type ReactNode, FC, memo, useEffect } from "react";
 import BoardTable from "./components/BoardTable";
 import { useTauriCommand } from "@/hooks";
 import { useSysStore } from "@/store";

@@ -1,5 +1,5 @@
 import { RingProgress, Table } from "@mantine/core";
-import React, { type ReactNode, FC, memo } from "react";
+import { type ReactNode, FC, memo } from "react";
 
 type GPUPerformanceTableProps = {
   children?: ReactNode;

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Code, Group } from "@mantine/core";
 import classes from "./NavbarSimple.module.css";
 

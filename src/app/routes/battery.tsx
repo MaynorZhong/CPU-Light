@@ -1,4 +1,4 @@
-import React, { type ReactNode, FC, memo, useEffect, useRef } from "react";
+import { type ReactNode, FC, memo, useEffect, useRef } from "react";
 import BatteryDetail from "./components/BatteryDetail";
 import { useTauriCommand } from "@/hooks";
 import { useSysStore } from "@/store";

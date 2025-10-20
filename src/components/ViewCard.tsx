@@ -1,5 +1,5 @@
 import React, { type ReactNode, FC, memo, useMemo } from "react";
-import { ActionIcon, Card, Flex, Menu } from "@mantine/core";
+import { Card, Flex } from "@mantine/core";
 import { motion } from "motion/react";
 
 type ViewCardProps = {

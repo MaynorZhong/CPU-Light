@@ -1,7 +1,7 @@
 import { useSysStore } from "@/store";
-import type { GPUAdapter, GPUInfo } from "@/types";
-import { Progress, Table } from "@mantine/core";
-import React, { type ReactNode, FC, memo } from "react";
+
+import { Table } from "@mantine/core";
+import { type ReactNode, FC, memo } from "react";
 import { useShallow } from "zustand/shallow";
 
 type GPUInfoTableProps = {

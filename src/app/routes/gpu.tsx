@@ -1,9 +1,9 @@
 import ViewCard from "@/components/ViewCard";
-import React, { type ReactNode, FC, memo, useEffect } from "react";
+import { type ReactNode, FC, memo, useEffect } from "react";
 import GPUInfoTable from "./components/GPUInfoTable";
 import { IconDeviceGamepad2 } from "@tabler/icons-react";
 import DisplayTable from "./components/DisplayTable";
-import GPUPerformanceTable from "./components/GPUPerformanceTable";
+
 import { useTauriCommand } from "@/hooks";
 import { useSysStore } from "@/store";
 import { useShallow } from "zustand/shallow";

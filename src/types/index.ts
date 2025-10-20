@@ -1,5 +1,3 @@
-import type { G } from "vitest/dist/reporters-w_64AS5f.js";
-
 type SysInfoType = Partial<{
   os_name: string;
   os_version: string;
