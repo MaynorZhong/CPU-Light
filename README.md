@@ -159,3 +159,10 @@ import type { MyType } from "@types/global";
 2. 安装依赖：`pnpm install`
 3. 启动开发服务器：`pnpm tauri:dev`
 4. 开始编码！
+
+
+## 安装
+如果您直接在realease直接下载并打开显示
+![alt text](image-1.png)
+或者其他提示。
+请阅读https://blog.csdn.net/weixin_44309889/article/details/134559474
