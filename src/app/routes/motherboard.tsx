@@ -1,5 +1,6 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { type ReactNode, FC, memo, useEffect } from "react";
-import BoardTable from "./components/BoardTable";
+import BoardTable from "../components/BoardTable";
 import { useTauriCommand } from "@/hooks";
 import { useSysStore } from "@/store";
 import { useShallow } from "zustand/shallow";
@@ -32,4 +33,10 @@ const Motherboard: FC<MotherboardProps> = props => {
   );
 };
 
-export default memo(Motherboard);
+const MotherboardMemoComponent = memo(Motherboard);
+
+export const Route = createFileRoute("/motherboard")({
+  component: MotherboardMemoComponent,
+});
+
+export default MotherboardMemoComponent;

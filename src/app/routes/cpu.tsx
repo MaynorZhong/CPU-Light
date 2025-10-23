@@ -1,15 +1,14 @@
-import ViewCard from "@/components/ViewCard";
-import { Table } from "@mantine/core";
-import React, { type ReactNode, FC, memo, useEffect, useRef } from "react";
-import CpuTable from "./components/CpuTable";
-import ClockTable from "./components/ClockTable";
-import CoreTable from "./components/CoreTable";
-import OrderTable from "./components/OrderTable";
-import PowerConsumptionTable from "./components/PowerConsumptionTable";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { type ReactNode, FC, memo, useEffect, useRef } from "react";
+import CpuTable from "../components/CpuTable";
+
+import CoreTable from "../components/CoreTable";
+
 import { useTauriCommand } from "@/hooks";
 import { useSysStore } from "@/store";
 import { useShallow } from "zustand/shallow";
-import ExtraCpuInfoTable from "./components/ExtraCpuInfoTable";
+import ExtraCpuInfoTable from "../components/ExtraCpuInfoTable";
 
 type CpuProps = {
   children?: ReactNode;
@@ -55,4 +54,10 @@ const Cpu: FC<CpuProps> = props => {
   );
 };
 
-export default memo(Cpu);
+const CpuMemoComponent = memo(Cpu);
+
+export const Route = createFileRoute("/cpu")({
+  component: CpuMemoComponent,
+});
+
+export default CpuMemoComponent;

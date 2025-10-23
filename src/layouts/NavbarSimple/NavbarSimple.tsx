@@ -1,23 +1,23 @@
 import { Code, Group } from "@mantine/core";
 import classes from "./NavbarSimple.module.css";
 
-import { NavLink } from "react-router";
-
 import Logo from "@/assets/app.svg?react";
 
 import { NAV_CONFIG } from "@/constants";
 import { ActionToggle } from "@/components/ActionToggle";
+import { Link } from "@tanstack/react-router";
 
 export function NavbarSimple() {
   const links = NAV_CONFIG.map(item => (
-    <NavLink
+    <Link
       to={item.link}
       key={item.key}
-      className={({ isActive }) => (isActive ? classes.active : classes.link)}
+      activeProps={{ className: classes.active }}
+      className={classes.link}
     >
       <item.icon className={classes.linkIcon} stroke={1.5} />
       <span>{item.label}</span>
-    </NavLink>
+    </Link>
   ));
 
   return (

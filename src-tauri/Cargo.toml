@@ -1,8 +1,8 @@
 [package]
 name = "cpu-light"
-version = "0.1.0"
+version = "1.0.0"
 description = "A Tauri App"
-authors = ["you"]
+authors = ["Maynor Zhong"]
 edition = "2021"
 
 [profile.dev]

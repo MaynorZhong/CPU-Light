@@ -21,6 +21,17 @@
         "minWidth": 800,
         "minHeight": 600,
         "resizable": true,
+        "center": true,
+        "visible": false
+      },
+      {
+        "label": "splashscreen",
+        "url": "/splashscreen",
+        "width": 1000,
+        "height": 700,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
         "center": true
       }
     ],

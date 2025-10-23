@@ -1,12 +1,13 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { type ReactNode, FC, memo, useEffect } from "react";
-import CacheTable from "./components/CacheTable";
+import CacheTable from "../components/CacheTable";
 import { useSysStore } from "@/store";
 import { useTauriCommand } from "@/hooks";
 import type { CacheInfo } from "@/types";
 import { useShallow } from "zustand/shallow";
 
 type CacheProps = {
-  children: ReactNode;
+  children?: ReactNode;
 };
 
 const Cache: FC<CacheProps> = props => {
@@ -38,4 +39,10 @@ const Cache: FC<CacheProps> = props => {
   );
 };
 
-export default memo(Cache);
+const CacheMemoComponent = memo(Cache);
+
+export const Route = createFileRoute("/cache")({
+  component: CacheMemoComponent,
+});
+
+export default CacheMemoComponent;

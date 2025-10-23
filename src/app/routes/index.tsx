@@ -1,10 +1,11 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { Container } from "@mantine/core";
 import ViewCard from "@/components/ViewCard";
 
-import EquipmentTable from "./components/EquipmentTable";
-import SystemStatusTable from "./components/SystemStatusTable";
-import BatteryTable from "./components/BatteryTable";
-import NetworkTable from "./components/NetworkTable";
+import EquipmentTable from "../components/EquipmentTable";
+import SystemStatusTable from "../components/SystemStatusTable";
+import BatteryTable from "../components/BatteryTable";
+import NetworkTable from "../components/NetworkTable";
 
 import {
   IconAdjustmentsCog,
@@ -25,6 +26,10 @@ import type {
   SysInfoType,
   SystemMetrics,
 } from "@/types";
+
+export const Route = createFileRoute("/")({
+  component: Home,
+});
 
 function Home() {
   const { execute } = useTauriCommand<SysInfoType>("get_system_info");

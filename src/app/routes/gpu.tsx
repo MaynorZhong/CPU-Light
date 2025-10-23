@@ -1,8 +1,9 @@
+import { createFileRoute } from "@tanstack/react-router";
 import ViewCard from "@/components/ViewCard";
 import { type ReactNode, FC, memo, useEffect } from "react";
-import GPUInfoTable from "./components/GPUInfoTable";
+import GPUInfoTable from "../components/GPUInfoTable";
 import { IconDeviceGamepad2 } from "@tabler/icons-react";
-import DisplayTable from "./components/DisplayTable";
+import DisplayTable from "../components/DisplayTable";
 
 import { useTauriCommand } from "@/hooks";
 import { useSysStore } from "@/store";
@@ -10,7 +11,7 @@ import { useShallow } from "zustand/shallow";
 import type { GPUInfo } from "@/types";
 
 type GpuProps = {
-  children: ReactNode;
+  children?: ReactNode;
 };
 
 const Gpu: FC<GpuProps> = props => {
@@ -47,4 +48,10 @@ const Gpu: FC<GpuProps> = props => {
   );
 };
 
-export default memo(Gpu);
+const GpuMemoComponent = memo(Gpu);
+
+export const Route = createFileRoute("/gpu")({
+  component: GpuMemoComponent,
+});
+
+export default GpuMemoComponent;
