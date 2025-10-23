@@ -1,0 +1,156 @@
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="chipGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4f46e5;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#7c3aed;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="lightGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="surfaceGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e293b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#334155;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="innerShadow">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
+      <feOffset dx="2" dy="2" result="offset"/>
+    </filter>
+    <filter id="dropShadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background with depth -->
+  <circle cx="128" cy="128" r="118" fill="url(#chipGradient)" opacity="0.15" filter="url(#dropShadow)"/>
+  
+  <!-- Main CPU chip body with enhanced depth -->
+  <rect x="60" y="60" width="136" height="136" rx="20" ry="20" 
+        fill="url(#surfaceGradient)" 
+        filter="url(#dropShadow)"/>
+  
+  <!-- Inner chip surface -->
+  <rect x="64" y="64" width="128" height="128" rx="16" ry="16" 
+        fill="url(#chipGradient)" 
+        stroke="rgba(255,255,255,0.2)" 
+        stroke-width="1"/>
+  
+  <!-- Modern CPU pins with better spacing -->
+  <!-- Top pins -->
+  <rect x="88" y="44" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="96" y="44" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="104" y="44" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="112" y="44" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="120" y="44" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="128" y="44" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="136" y="44" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="144" y="44" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="152" y="44" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="160" y="44" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="168" y="44" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  
+  <!-- Bottom pins -->
+  <rect x="88" y="196" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="96" y="196" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="104" y="196" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="112" y="196" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="120" y="196" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="128" y="196" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="136" y="196" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="144" y="196" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="152" y="196" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="160" y="196" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="168" y="196" width="3" height="16" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  
+  <!-- Left pins -->
+  <rect x="44" y="88" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="44" y="96" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="44" y="104" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="44" y="112" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="44" y="120" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="44" y="128" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="44" y="136" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="44" y="144" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="44" y="152" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="44" y="160" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="44" y="168" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  
+  <!-- Right pins -->
+  <rect x="196" y="88" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="196" y="96" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="196" y="104" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="196" y="112" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="196" y="120" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="196" y="128" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="196" y="136" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="196" y="144" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="196" y="152" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="196" y="160" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  <rect x="196" y="168" width="16" height="3" rx="1.5" fill="#4f46e5" opacity="0.9"/>
+  
+  <!-- Central processing core with layered design -->
+  <rect x="84" y="84" width="88" height="88" rx="12" ry="12" 
+        fill="rgba(30, 41, 59, 0.8)" 
+        stroke="rgba(79, 70, 229, 0.4)" 
+        stroke-width="1"/>
+  
+  <!-- Inner processing unit -->
+  <rect x="92" y="92" width="72" height="72" rx="8" ry="8" 
+        fill="rgba(15, 23, 42, 0.9)" 
+        stroke="rgba(124, 58, 237, 0.3)" 
+        stroke-width="1"/>
+  
+  <!-- Advanced circuit pattern -->
+  <g stroke="rgba(79, 70, 229, 0.6)" stroke-width="1.5" fill="none" opacity="0.8">
+    <!-- Main circuit lines -->
+    <path d="M 104 104 L 104 120 L 152 120 L 152 104"/>
+    <path d="M 104 136 L 152 136 L 152 152 L 104 152"/>
+    <!-- Vertical connectors -->
+    <path d="M 118 104 L 118 88"/>
+    <path d="M 138 104 L 138 88"/>
+    <path d="M 118 152 L 118 168"/>
+    <path d="M 138 152 L 138 168"/>
+    <!-- Cross connections -->
+    <path d="M 96 128 L 104 128"/>
+    <path d="M 152 128 L 160 128"/>
+    <!-- Micro circuits -->
+    <circle cx="110" cy="110" r="2" stroke="rgba(59, 130, 246, 0.8)" stroke-width="1"/>
+    <circle cx="146" cy="110" r="2" stroke="rgba(59, 130, 246, 0.8)" stroke-width="1"/>
+    <circle cx="110" cy="146" r="2" stroke="rgba(59, 130, 246, 0.8)" stroke-width="1"/>
+    <circle cx="146" cy="146" r="2" stroke="rgba(59, 130, 246, 0.8)" stroke-width="1"/>
+  </g>
+  
+  <!-- Enhanced light effect (CPU-Light branding) -->
+  <circle cx="144" cy="112" r="16" fill="url(#lightGradient)" 
+          filter="url(#glow)" opacity="0.9"/>
+  <circle cx="144" cy="112" r="10" fill="rgba(251, 191, 36, 0.8)" opacity="0.9"/>
+  <circle cx="144" cy="112" r="6" fill="rgba(255, 255, 255, 0.9)"/>
+  <circle cx="144" cy="112" r="3" fill="#fbbf24"/>
+  
+  <!-- Light rays emanating from the core -->
+  <g stroke="#fbbf24" stroke-width="1" opacity="0.6">
+    <path d="M 144 96 L 144 88"/>
+    <path d="M 160 112 L 168 112"/>
+    <path d="M 154 98 L 160 92"/>
+    <path d="M 154 126 L 160 132"/>
+  </g>
+  
+  <!-- Corner accent elements -->
+  <circle cx="76" cy="76" r="2" fill="rgba(79, 70, 229, 0.8)"/>
+  <circle cx="180" cy="76" r="2" fill="rgba(79, 70, 229, 0.8)"/>
+  <circle cx="76" cy="180" r="2" fill="rgba(79, 70, 229, 0.8)"/>
+  <circle cx="180" cy="180" r="2" fill="rgba(79, 70, 229, 0.8)"/>
+  
+  <!-- CPU text indicator (subtle) -->
+  <g fill="rgba(255, 255, 255, 0.7)" font-family="Arial, sans-serif" font-size="8" font-weight="bold" text-anchor="middle">
+    <text x="128" y="180">CPU</text>
+  </g>
+</svg>
