@@ -1,12 +1,13 @@
-import React, { type ReactNode, FC, memo, useEffect, useRef } from "react";
-import BatteryDetail from "./components/BatteryDetail";
+import { createFileRoute } from "@tanstack/react-router";
+import { type ReactNode, FC, memo, useEffect, useRef } from "react";
+import BatteryDetail from "../components/BatteryDetail";
 import { useTauriCommand } from "@/hooks";
 import { useSysStore } from "@/store";
 import { useShallow } from "zustand/shallow";
 import type { BatteryInfoType } from "@/types";
 
 type BatteryProps = {
-  children: ReactNode;
+  children?: ReactNode;
 };
 
 const Battery: FC<BatteryProps> = props => {
@@ -52,4 +53,10 @@ const Battery: FC<BatteryProps> = props => {
   );
 };
 
-export default memo(Battery);
+const BatteryMemoComponent = memo(Battery);
+
+export const Route = createFileRoute("/battery")({
+  component: BatteryMemoComponent,
+});
+
+export default BatteryMemoComponent;

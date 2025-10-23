@@ -1,3 +1,7 @@
+mod tokios;
+use tokio::sync::Mutex;
+use tokios::{set_complete, setup, SetupState};
+
 use std::{
     collections::HashMap,
     process::Command,
@@ -6,7 +10,7 @@ use std::{
 
 use nix::libc;
 use regex::Regex;
-use tauri::{path::BaseDirectory, Manager};
+use tauri::{async_runtime::spawn, path::BaseDirectory, Manager};
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
@@ -1462,8 +1466,13 @@ pub fn run() {
             get_memory_info,
             get_memory_modules,
             get_gpu_info,
+            set_complete
         ])
         .setup(|app| {
+            app.manage(Mutex::new(SetupState {
+                frontend_task: false,
+                backend_task: false,
+            }));
             // 创建系统托盘
             if let Err(e) = tray::create_tray(app) {
                 log::error!("Failed to create tray: {}", e);
@@ -1473,6 +1482,10 @@ pub fn run() {
 
             log::info!("Application started successfully");
             log::info!("App version: {}", app.package_info().version);
+
+            // Spawn setup as a non-blocking task so the windows can be
+            // created and ran while it executes
+            spawn(setup(app.handle().clone()));
             Ok(())
         })
         .run(tauri::generate_context!())

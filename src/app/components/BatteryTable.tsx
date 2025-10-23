@@ -1,5 +1,5 @@
 import { Badge, Table } from "@mantine/core";
-import React, { type ReactNode, FC, memo } from "react";
+import { type ReactNode, FC, memo } from "react";
 import { Progress } from "@mantine/core";
 import { useSysStore } from "@/store";
 import { useShallow } from "zustand/shallow";

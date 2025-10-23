@@ -1,11 +1,10 @@
 import ViewCard from "@/components/ViewCard";
 import { useSysStore } from "@/store";
 import type { CacheInfo } from "@/types";
-import { byteToGB, byteToKB, byteToMB } from "@/utils/byte";
-import { pick } from "@/utils/pick";
+import { byteToKB, byteToMB } from "@/utils/byte";
 import { Table } from "@mantine/core";
 import { IconChevronCompactDown } from "@tabler/icons-react";
-import React, {
+import {
   type ReactNode,
   createContext,
   FC,

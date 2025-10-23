@@ -1,7 +1,7 @@
 import { useSysStore } from "@/store";
 import { formatSecondsToDHMS } from "@/utils/format-time";
 import { Table } from "@mantine/core";
-import React, { type ReactNode, FC, memo } from "react";
+import { type ReactNode, FC, memo } from "react";
 import { useShallow } from "zustand/shallow";
 
 type EquipmentTableProps = {

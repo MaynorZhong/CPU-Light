@@ -1,6 +1,6 @@
 import ViewCard from "@/components/ViewCard";
 import { Table } from "@mantine/core";
-import React, { type ReactNode, FC, memo } from "react";
+import { type ReactNode, FC, memo } from "react";
 
 type PowerConsumptionTableProps = {
   children?: ReactNode;

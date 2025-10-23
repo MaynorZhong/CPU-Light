@@ -1,8 +1,5 @@
-import { data } from "react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
-export async function clientLoader() {
-  return data({}, 404);
-}
 export default function CatchAll() {
   // 对于特定的开发者工具请求，返回空响应
   if (typeof window !== "undefined") {
@@ -22,3 +19,7 @@ export default function CatchAll() {
     </div>
   );
 }
+
+export const Route = createFileRoute("/$")({
+  component: CatchAll,
+});

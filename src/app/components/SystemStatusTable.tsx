@@ -1,6 +1,6 @@
 import { useSysStore } from "@/store";
 import { Table, Badge } from "@mantine/core";
-import React, { type ReactNode, FC, memo, useMemo } from "react";
+import { type ReactNode, FC, memo, useMemo } from "react";
 import { useShallow } from "zustand/shallow";
 
 type SystemStatusTableProps = {

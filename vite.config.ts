@@ -5,7 +5,9 @@ import { fileURLToPath } from "url";
 
 import svgr from "vite-plugin-svgr";
 
-import { reactRouter } from "@react-router/dev/vite";
+// import { reactRouter } from "@react-router/dev/vite";
+import react from "@vitejs/plugin-react";
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
 import tsconfigPaths from "vite-tsconfig-paths";
 
@@ -17,7 +19,17 @@ const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
 export default defineConfig(() => ({
-  plugins: [tailwindcss(), reactRouter(), tsconfigPaths(), svgr()],
+  plugins: [
+    tanstackRouter({
+      target: "react",
+      autoCodeSplitting: true,
+      routesDirectory: path.resolve(__dirname, "./src/app/routes"),
+    }),
+    react(),
+    tailwindcss(),
+    tsconfigPaths(),
+    svgr(),
+  ],
 
   // 路径别名配置
   resolve: {
@@ -40,7 +52,7 @@ export default defineConfig(() => ({
     // 优化构建大小
     minify: "esbuild" as const,
     // 输出目录
-    outDir: "dist",
+    outDir: "build",
     // 清空输出目录
     emptyOutDir: true,
     // 静态资源处理

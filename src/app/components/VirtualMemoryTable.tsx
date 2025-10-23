@@ -2,13 +2,7 @@ import { useSysStore } from "@/store";
 import type { MemoryInfoType } from "@/types";
 import { byteToGB } from "@/utils/byte";
 import { Badge, Table, Tooltip } from "@mantine/core";
-import React, {
-  type NamedExoticComponent,
-  type ReactNode,
-  FC,
-  memo,
-  useMemo,
-} from "react";
+import { type ReactNode, FC, useMemo } from "react";
 import { useShallow } from "zustand/shallow";
 
 type VirtualMemoryTableProps = {

@@ -1,9 +1,10 @@
+import { createFileRoute } from "@tanstack/react-router";
 import ViewCard from "@/components/ViewCard";
 import { IconBrandOnedrive, IconDatabase } from "@tabler/icons-react";
-import React, { type ReactNode, FC, memo, useEffect, useRef } from "react";
+import { type ReactNode, FC, memo, useEffect, useRef } from "react";
 
-import MemoryTable from "./components/MemoryTable";
-import VirtualMemoryTable from "./components/VirtualMemoryTable";
+import MemoryTable from "../components/MemoryTable";
+import VirtualMemoryTable from "../components/VirtualMemoryTable";
 import { Table } from "@mantine/core";
 import { useTauriCommand } from "@/hooks";
 import { useSysStore } from "@/store";
@@ -12,7 +13,7 @@ import type { MemoryInfoType, MemoryModuleInfo } from "@/types";
 import { byteToGB, byteToMB } from "@/utils/byte";
 
 type MemoryProps = {
-  children: ReactNode;
+  children?: ReactNode;
 };
 
 const Memory: FC<MemoryProps> = props => {
@@ -239,4 +240,10 @@ const Memory: FC<MemoryProps> = props => {
   );
 };
 
-export default memo(Memory);
+const MemoryMemoComponent = memo(Memory);
+
+export const Route = createFileRoute("/memory")({
+  component: MemoryMemoComponent,
+});
+
+export default MemoryMemoComponent;
